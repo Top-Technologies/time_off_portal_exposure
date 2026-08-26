@@ -1,0 +1,106 @@
+/* Time Off Portal Exposure CSS */
+
+/* Stepper Component */
+.stepper-wrapper {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    position: relative;
+}
+
+.stepper-wrapper::before {
+    content: "";
+    position: absolute;
+    top: 20px;
+    left: 40px;
+    right: 40px;
+    height: 3px;
+    background-color: #e2e8f0;
+    z-index: 1;
+}
+
+.stepper-item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    z-index: 2;
+}
+
+.step-counter {
+    position: relative;
+    z-index: 5;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px solid #cbd5e1;
+    color: #64748b;
+    font-weight: 700;
+    margin-bottom: 8px;
+    transition: all 0.3s ease;
+}
+
+.step-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #64748b;
+    text-align: center;
+}
+
+.stepper-item.active .step-counter {
+    border-color: #3b82f6;
+    background-color: #3b82f6;
+    color: #ffffff;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+}
+
+.stepper-item.active .step-name {
+    color: #1e293b;
+    font-weight: 700;
+}
+
+.stepper-item.completed .step-counter {
+    border-color: #10b981;
+    background-color: #10b981;
+    color: #ffffff;
+}
+
+.stepper-item.completed .step-name {
+    color: #047857;
+}
+
+/* Card & Widget Hover */
+.portal-time-off-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.portal-time-off-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Badges */
+.badge-soft-primary {
+    background-color: rgba(59, 130, 246, 0.12);
+    color: #1d4ed8;
+}
+
+.badge-soft-success {
+    background-color: rgba(16, 185, 129, 0.12);
+    color: #047857;
+}
+
+.badge-soft-warning {
+    background-color: rgba(245, 158, 11, 0.12);
+    color: #b45309;
+}
+
+.badge-soft-danger {
+    background-color: rgba(239, 68, 68, 0.12);
+    color: #b91c1c;
+}

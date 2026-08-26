@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- 1. Notification to Manager on Submission -->
+        <record id="email_template_time_off_submitted_manager" model="mail.template">
+            <field name="name">Time Off: Request Submitted (Manager Notification)</field>
+            <field name="model_id" ref="hr_holidays.model_hr_leave"/>
+            <field name="subject">New Time Off Request: {{ object.employee_id.name }} ({{ object.holiday_status_id.name }})</field>
+            <field name="partner_to">{{ (object.employee_id.parent_id.user_id.partner_id.id or object.employee_id.leave_manager_id.partner_id.id or object.employee_id.parent_id.work_contact_id.id) }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <h2 style="color: #1e293b; margin-top: 0;">New Time Off Request</h2>
+                    <p style="color: #475569;">Hello,</p>
+                    <p style="color: #475569;">
+                        <strong><t t-out="object.employee_id.name"/></strong> has submitted a new time off request requiring your approval.
+                    </p>
+                    <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+                        <p style="margin: 5px 0;"><strong>Leave Type:</strong> <t t-out="object.holiday_status_id.name"/></p>
+                        <p style="margin: 5px 0;"><strong>Period:</strong> <t t-out="object.request_date_from"/> to <t t-out="object.request_date_to"/></p>
+                        <p style="margin: 5px 0;"><strong>Duration:</strong> <t t-out="object.number_of_days"/> days / <t t-out="object.number_of_hours"/> hours</p>
+                        <t t-if="object.name">
+                            <p style="margin: 5px 0;"><strong>Reason:</strong> <t t-out="object.name"/></p>
+                        </t>
+                    </div>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a t-attf-href="/my/time_off/{{ object.id }}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                            Review &amp; Approve on Portal
+                        </a>
+                    </div>
+                    <p style="color: #94a3b8; font-size: 12px; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 10px;">
+                        This is an automated notification from your HR Time Off portal.
+                    </p>
+                </div>
+            </field>
+        </record>
+
+        <!-- 2. Notification to HR Officer when Manager Approves -->
+        <record id="email_template_time_off_manager_approved_hr" model="mail.template">
+            <field name="name">Time Off: Manager Approved (HR Officer Notification)</field>
+            <field name="model_id" ref="hr_holidays.model_hr_leave"/>
+            <field name="subject">Manager Approved: Time Off Request for {{ object.employee_id.name }}</field>
+            <field name="partner_to">{{ (object.employee_id.time_off_officer_id.partner_id.id or '') }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <h2 style="color: #1e293b; margin-top: 0;">Time Off Final Approval Needed</h2>
+                    <p style="color: #475569;">Hello <t t-out="object.employee_id.time_off_officer_id.name or 'HR Officer'"/>,</p>
+                    <p style="color: #475569;">
+                        The time off request for <strong><t t-out="object.employee_id.name"/></strong> has been approved by their direct manager (<t t-out="object.manager_approved_by_id.name or 'Manager'"/>) and is now pending your final validation.
+                    </p>
+                    <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #10b981;">
+                        <p style="margin: 5px 0;"><strong>Employee:</strong> <t t-out="object.employee_id.name"/></p>
+                        <p style="margin: 5px 0;"><strong>Leave Type:</strong> <t t-out="object.holiday_status_id.name"/></p>
+                        <p style="margin: 5px 0;"><strong>Period:</strong> <t t-out="object.request_date_from"/> to <t t-out="object.request_date_to"/></p>
+                        <p style="margin: 5px 0;"><strong>Duration:</strong> <t t-out="object.number_of_days"/> days</p>
+                    </div>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a t-attf-href="/odoo/time-off/{{ object.id }}" style="background-color: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                            Validate in Odoo Backend
+                        </a>
+                    </div>
+                    <p style="color: #94a3b8; font-size: 12px; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 10px;">
+                        This notification was dispatched automatically.
+                    </p>
+                </div>
+            </field>
+        </record>
+
+        <!-- 3. Notification to Employee when Manager Approves -->
+        <record id="email_template_time_off_manager_approved_employee" model="mail.template">
+            <field name="name">Time Off: Manager Approved (Employee Notification)</field>
+            <field name="model_id" ref="hr_holidays.model_hr_leave"/>
+            <field name="subject">Manager Approved: Your Time Off Request ({{ object.holiday_status_id.name }})</field>
+            <field name="partner_to">{{ (object.employee_id.user_id.partner_id.id or object.employee_id.work_contact_id.id) }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <h2 style="color: #1e293b; margin-top: 0;">Manager Approval Granted</h2>
+                    <p style="color: #475569;">Hello <t t-out="object.employee_id.name"/>,</p>
+                    <p style="color: #475569;">
+                        Your time off request from <strong><t t-out="object.request_date_from"/></strong> to <strong><t t-out="object.request_date_to"/></strong> has been approved by your manager and has now been forwarded to HR for final confirmation.
+                    </p>
+                    <div style="text-align: center; margin: 25px 0;">
+                        <a t-attf-href="/my/time_off/{{ object.id }}" style="background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                            View Request Status
+                        </a>
+                    </div>
+                </div>
+            </field>
+        </record>
+
+        <!-- 4. Notification to Employee on Final Approval -->
+        <record id="email_template_time_off_approved_employee" model="mail.template">
+            <field name="name">Time Off: Final Approval (Employee Notification)</field>
+            <field name="model_id" ref="hr_holidays.model_hr_leave"/>
+            <field name="subject">Approved: Your Time Off Request ({{ object.holiday_status_id.name }})</field>
+            <field name="partner_to">{{ (object.employee_id.user_id.partner_id.id or object.employee_id.work_contact_id.id) }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <span style="background-color: #dcfce7; color: #166534; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 14px;">
+                            ✓ Request Fully Approved
+                        </span>
+                    </div>
+                    <h2 style="color: #1e293b; text-align: center; margin-top: 10px;">Time Off Approved!</h2>
+                    <p style="color: #475569;">Hello <t t-out="object.employee_id.name"/>,</p>
+                    <p style="color: #475569;">
+                        We are pleased to inform you that your time off request has been officially approved.
+                    </p>
+                    <div style="background-color: #f0fdf4; padding: 15px; border-radius: 6px; margin: 20px 0; border: 1px solid #bbf7d0;">
+                        <p style="margin: 5px 0;"><strong>Leave Type:</strong> <t t-out="object.holiday_status_id.name"/></p>
+                        <p style="margin: 5px 0;"><strong>Period:</strong> <t t-out="object.request_date_from"/> to <t t-out="object.request_date_to"/></p>
+                        <p style="margin: 5px 0;"><strong>Total Days:</strong> <t t-out="object.number_of_days"/> days</p>
+                    </div>
+                    <div style="text-align: center; margin: 25px 0;">
+                        <a t-attf-href="/my/time_off/{{ object.id }}" style="background-color: #16a34a; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                            View in Portal
+                        </a>
+                    </div>
+                </div>
+            </field>
+        </record>
+
+        <!-- 5. Notification to Employee on Refusal -->
+        <record id="email_template_time_off_refused_employee" model="mail.template">
+            <field name="name">Time Off: Request Refused (Employee Notification)</field>
+            <field name="model_id" ref="hr_holidays.model_hr_leave"/>
+            <field name="subject">Refused: Your Time Off Request ({{ object.holiday_status_id.name }})</field>
+            <field name="partner_to">{{ (object.employee_id.user_id.partner_id.id or object.employee_id.work_contact_id.id) }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <span style="background-color: #fee2e2; color: #991b1b; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 14px;">
+                            ✗ Request Refused
+                        </span>
+                    </div>
+                    <h2 style="color: #1e293b; text-align: center; margin-top: 10px;">Time Off Request Refused</h2>
+                    <p style="color: #475569;">Hello <t t-out="object.employee_id.name"/>,</p>
+                    <p style="color: #475569;">
+                        Your time off request from <strong><t t-out="object.request_date_from"/></strong> to <strong><t t-out="object.request_date_to"/></strong> has been refused.
+                    </p>
+                    <div style="background-color: #fef2f2; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #ef4444;">
+                        <p style="margin: 5px 0; color: #991b1b;"><strong>Refusal Reason:</strong></p>
+                        <p style="margin: 5px 0; color: #7f1d1d;"><t t-out="object.refusal_reason or 'No specific reason provided.'"/></p>
+                    </div>
+                    <div style="text-align: center; margin: 25px 0;">
+                        <a t-attf-href="/my/time_off/{{ object.id }}" style="background-color: #64748b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                            View in Portal
+                        </a>
+                    </div>
+                </div>
+            </field>
+        </record>
+
+    </data>
+</odoo>

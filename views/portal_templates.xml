@@ -1,0 +1,979 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================= -->
+    <!-- 1. Portal Home Cards & Breadcrumbs                                -->
+    <!-- ================================================================= -->
+
+    <template id="portal_my_home_time_off" name="Portal My Home : Time Off Entries" inherit_id="portal.portal_my_home" priority="40">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="icon" t-value="'/time_off_portal_exposure/static/src/img/calendar.svg'"/>
+                <t t-set="title">My Time Off</t>
+                <t t-set="url" t-value="'/my/time_off'"/>
+                <t t-set="placeholder_count" t-value="'time_off_count'"/>
+            </t>
+            <t t-if="time_off_to_approve_count is not None and time_off_to_approve_count &gt; 0">
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="icon" t-value="'/time_off_portal_exposure/static/src/img/check-circle.svg'"/>
+                    <t t-set="title">Time Off to Approve</t>
+                    <t t-set="url" t-value="'/my/time_off/to_approve'"/>
+                    <t t-set="count" t-value="time_off_to_approve_count"/>
+                </t>
+            </t>
+        </xpath>
+    </template>
+
+    <template id="portal_breadcrumbs_time_off" name="Portal Breadcrumbs : Time Off" inherit_id="portal.portal_breadcrumbs" priority="40">
+        <xpath expr="//ol[hasclass('o_portal_submenu')]" position="inside">
+            <li t-if="page_name == 'time_off_dashboard' or page_name == 'time_off_detail' or page_name == 'time_off_new'" class="breadcrumb-item">
+                <a t-if="page_name != 'time_off_dashboard'" href="/my/time_off">My Time Off</a>
+                <span t-else="">My Time Off</span>
+            </li>
+            <li t-if="page_name == 'time_off_new'" class="breadcrumb-item active">
+                <span>New Request</span>
+            </li>
+            <li t-if="page_name == 'time_off_detail'" class="breadcrumb-item active">
+                <span t-esc="leave.holiday_status_id.name"/> (<span t-esc="leave.request_date_from"/>)
+            </li>
+            <li t-if="page_name == 'time_off_to_approve'" class="breadcrumb-item active">
+                <span>Time Off to Approve</span>
+            </li>
+        </xpath>
+    </template>
+
+    <!-- ================================================================= -->
+    <!-- 2. Warning / Info Templates                                       -->
+    <!-- ================================================================= -->
+
+    <template id="portal_no_employee_linked" name="No Employee Linked Warning">
+        <t t-call="portal.portal_layout">
+            <div class="container py-5">
+                <div class="alert alert-warning text-center shadow-sm p-4 rounded-3" role="alert">
+                    <i class="fa fa-exclamation-triangle fa-3x text-warning mb-3 d-block"/>
+                    <h4 class="alert-heading fw-bold">No Employee Record Linked</h4>
+                    <p class="mb-3">Your portal user account is not currently linked to an active Employee profile in the system.</p>
+                    <hr/>
+                    <p class="mb-0 text-muted">Please contact your HR department or system administrator to link your employee profile.</p>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_not_a_manager" name="Not a Manager Warning">
+        <t t-call="portal.portal_layout">
+            <div class="container py-5">
+                <div class="alert alert-info text-center shadow-sm p-4 rounded-3" role="alert">
+                    <i class="fa fa-info-circle fa-3x text-info mb-3 d-block"/>
+                    <h4 class="alert-heading fw-bold">No Subordinates Found</h4>
+                    <p class="mb-0">You currently do not have any subordinates assigned to you for time off approvals.</p>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- ================================================================= -->
+    <!-- 3. My Time Off Dashboard                                          -->
+    <!-- ================================================================= -->
+
+    <template id="portal_my_time_off_dashboard" name="My Time Off Dashboard">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <div class="container-fluid px-0 py-3">
+
+                <!-- Header & Quick Action -->
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+                    <div>
+                        <h2 class="fw-bold mb-1 text-primary">
+                            <i class="fa fa-plane me-2"/>Time Off Dashboard
+                        </h2>
+                        <p class="text-muted mb-0">Manage your leave balances and request time off</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <t t-if="is_manager">
+                            <a href="/my/time_off/to_approve" class="btn btn-outline-primary d-flex align-items-center gap-2">
+                                <i class="fa fa-users"/>
+                                <span>Team Approvals</span>
+                            </a>
+                        </t>
+                        <a href="/my/time_off/new" class="btn btn-primary d-flex align-items-center gap-2 shadow-sm">
+                            <i class="fa fa-plus-circle"/>
+                            <span>New Request</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- KPI Metric Summary Cards -->
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-md-4">
+                        <div class="card border-0 shadow-sm rounded-3 bg-gradient bg-primary text-white p-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="text-white-50 small text-uppercase fw-bold">Total Remaining</div>
+                                    <div class="display-6 fw-bold my-1"><t t-esc="total_remaining"/> <span class="fs-6">days</span></div>
+                                    <div class="small text-white-50">Across valid allocations</div>
+                                </div>
+                                <div class="bg-white bg-opacity-25 rounded-circle p-3">
+                                    <i class="fa fa-calendar-check-o fa-2x text-white"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <div class="card border-0 shadow-sm rounded-3 bg-white p-3 border-start border-warning border-4">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="text-muted small text-uppercase fw-bold">Pending Approval</div>
+                                    <div class="display-6 fw-bold my-1 text-warning"><t t-esc="pending_count"/></div>
+                                    <div class="small text-muted">Awaiting manager or HR review</div>
+                                </div>
+                                <div class="bg-warning bg-opacity-10 rounded-circle p-3">
+                                    <i class="fa fa-clock-o fa-2x text-warning"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <div class="card border-0 shadow-sm rounded-3 bg-white p-3 border-start border-success border-4">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="text-muted small text-uppercase fw-bold">Approved This Year</div>
+                                    <div class="display-6 fw-bold my-1 text-success"><t t-esc="approved_this_year"/></div>
+                                    <div class="small text-muted">Validated requests</div>
+                                </div>
+                                <div class="bg-success bg-opacity-10 rounded-circle p-3">
+                                    <i class="fa fa-check-circle fa-2x text-success"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Allocation Balances Breakdown -->
+                <div class="card border-0 shadow-sm rounded-3 mb-4">
+                    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-bold text-secondary">
+                            <i class="fa fa-pie-chart me-2 text-primary"/>Time Off Balances
+                        </h5>
+                        <span class="badge bg-light text-dark border">Real-Time</span>
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="row g-3">
+                            <t t-foreach="balances" t-as="bal">
+                                <div class="col-12 col-sm-6 col-lg-4">
+                                    <div class="p-3 border rounded-3 bg-light bg-opacity-50 h-100 d-flex flex-column justify-content-between">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <span class="fw-bold text-dark fs-6" t-esc="bal['name']"/>
+                                            <span t-if="bal['requires_allocation']" class="badge bg-primary bg-opacity-10 text-primary">
+                                                <t t-esc="bal['remaining']"/> <t t-esc="'hrs' if bal['request_unit'] == 'hour' else 'days'"/> left
+                                            </span>
+                                            <span t-else="" class="badge bg-secondary bg-opacity-10 text-secondary">
+                                                No Limit
+                                            </span>
+                                        </div>
+                                        <div class="small text-muted mb-2">
+                                            <t t-if="bal['requires_allocation']">
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span>Allocated:</span>
+                                                    <strong><t t-esc="bal['allocated']"/></strong>
+                                                </div>
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span>Taken:</span>
+                                                    <span class="text-danger fw-semibold"><t t-esc="bal['taken']"/></span>
+                                                </div>
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span>Pending:</span>
+                                                    <span class="text-warning fw-semibold"><t t-esc="bal['pending']"/></span>
+                                                </div>
+                                                <div class="progress mt-2" style="height: 6px;">
+                                                    <t t-set="pct" t-value="(bal['taken'] / bal['allocated'] * 100) if bal['allocated'] &gt; 0 else 0"/>
+                                                    <div class="progress-bar bg-primary" role="progressbar" t-attf-style="width: {{ pct }}%;" t-att-aria-valuenow="pct" aria-valuemin="0" aria-valuemax="100"/>
+                                                </div>
+                                            </t>
+                                            <t t-else="">
+                                                <span>Taken so far: <strong class="text-danger"><t t-esc="bal['taken']"/></strong> <t t-esc="'hours' if bal['request_unit'] == 'hour' else 'days'"/></span>
+                                            </t>
+                                        </div>
+                                        <div class="text-end mt-2">
+                                            <a t-attf-href="/my/time_off/new?type_id={{ bal['id'] }}" class="btn btn-sm btn-outline-primary py-0 px-2 small">
+                                                Request <i class="fa fa-arrow-right ms-1"/>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Requests History Table -->
+                <div class="card border-0 shadow-sm rounded-3">
+                    <div class="card-header bg-white py-3 border-bottom d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                        <h5 class="mb-0 fw-bold text-secondary">
+                            <i class="fa fa-history me-2 text-primary"/>Request History
+                        </h5>
+                        <!-- Filter and Sorting -->
+                        <div class="d-flex gap-2 align-items-center">
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                    <i class="fa fa-filter me-1"/> Filter: <span t-esc="filters[filterby]['label']"/>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <t t-foreach="filters" t-as="f_key">
+                                        <li>
+                                            <a class="dropdown-item" t-attf-href="/my/time_off?filterby={{ f_key }}&amp;sortby={{ sortby }}" t-esc="filters[f_key]['label']"/>
+                                        </li>
+                                    </t>
+                                </ul>
+                            </div>
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                    <i class="fa fa-sort me-1"/> Sort: <span t-esc="sortings[sortby]['label']"/>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <t t-foreach="sortings" t-as="s_key">
+                                        <li>
+                                            <a class="dropdown-item" t-attf-href="/my/time_off?sortby={{ s_key }}&amp;filterby={{ filterby }}" t-esc="sortings[s_key]['label']"/>
+                                        </li>
+                                    </t>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-body p-0">
+                        <t t-if="not leaves">
+                            <div class="text-center py-5 text-muted">
+                                <i class="fa fa-folder-open-o fa-3x mb-3 text-secondary"/>
+                                <p class="mb-2">No time off requests found.</p>
+                                <a href="/my/time_off/new" class="btn btn-sm btn-primary">Submit First Request</a>
+                            </div>
+                        </t>
+                        <t t-else="">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Start Date</th>
+                                            <th>End Date</th>
+                                            <th>Duration</th>
+                                            <th>Reason</th>
+                                            <th>Status</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="leaves" t-as="leave">
+                                            <tr>
+                                                <td>
+                                                    <span class="fw-semibold text-dark" t-esc="leave.holiday_status_id.name"/>
+                                                </td>
+                                                <td>
+                                                    <span t-esc="leave.request_date_from"/>
+                                                    <t t-if="leave.request_unit_half">
+                                                        <span class="badge bg-secondary ms-1"><t t-esc="'Morning' if leave.request_date_from_period == 'am' else 'Afternoon'"/></span>
+                                                    </t>
+                                                </td>
+                                                <td>
+                                                    <span t-esc="leave.request_date_to or leave.request_date_from"/>
+                                                </td>
+                                                <td>
+                                                    <span class="fw-bold">
+                                                        <t t-if="leave.holiday_status_id.request_unit == 'hour'">
+                                                            <t t-esc="leave.number_of_hours"/> hours
+                                                        </t>
+                                                        <t t-else="">
+                                                            <t t-esc="leave.number_of_days"/> days
+                                                        </t>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span class="text-truncate d-inline-block text-muted" style="max-width: 200px;" t-esc="leave.name or '-'"/>
+                                                </td>
+                                                <td>
+                                                    <t t-if="leave.portal_state == 'approved'">
+                                                        <span class="badge rounded-pill bg-success px-3 py-1">Approved</span>
+                                                    </t>
+                                                    <t t-elif="leave.portal_state == 'pending_manager'">
+                                                        <span class="badge rounded-pill bg-warning text-dark px-3 py-1">To Approve (Manager)</span>
+                                                    </t>
+                                                    <t t-elif="leave.portal_state == 'pending_hr'">
+                                                        <span class="badge rounded-pill bg-info text-dark px-3 py-1">To Approve (HR Officer)</span>
+                                                    </t>
+                                                    <t t-elif="leave.portal_state == 'refused'">
+                                                        <span class="badge rounded-pill bg-danger px-3 py-1">Refused</span>
+                                                    </t>
+                                                    <t t-elif="leave.portal_state == 'cancelled'">
+                                                        <span class="badge rounded-pill bg-secondary px-3 py-1">Cancelled</span>
+                                                    </t>
+                                                    <t t-else="">
+                                                        <span class="badge rounded-pill bg-light text-dark border px-3 py-1" t-esc="leave.state"/>
+                                                    </t>
+                                                </td>
+                                                <td class="text-end">
+                                                    <a t-attf-href="/my/time_off/{{ leave.id }}" class="btn btn-sm btn-outline-primary" title="View Details">
+                                                        <i class="fa fa-eye"/> Details
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </t>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div t-if="pager['page_count'] &gt; 1" class="card-footer bg-white d-flex justify-content-center py-3">
+                        <t t-call="portal.pager"/>
+                    </div>
+                </div>
+
+            </div>
+        </t>
+    </template>
+
+    <!-- ================================================================= -->
+    <!-- 4. Submit New Time Off Request Form                               -->
+    <!-- ================================================================= -->
+
+    <template id="portal_my_time_off_new" name="Submit New Time Off Request">
+        <t t-call="portal.portal_layout">
+            <div class="container py-4">
+
+                <div class="row justify-content-center">
+                    <div class="col-12 col-lg-9">
+
+                        <div class="card border-0 shadow-sm rounded-3">
+                            <div class="card-header bg-primary text-white py-3">
+                                <h4 class="mb-0 fw-bold">
+                                    <i class="fa fa-paper-plane me-2"/>Request Time Off
+                                </h4>
+                            </div>
+
+                            <div class="card-body p-4">
+
+                                <!-- Alert Messages -->
+                                <t t-if="errors">
+                                    <div class="alert alert-danger shadow-sm rounded-3 mb-4">
+                                        <h6 class="fw-bold mb-2"><i class="fa fa-exclamation-circle me-1"/> Please fix the following errors:</h6>
+                                        <ul class="mb-0 ps-3">
+                                            <t t-foreach="errors" t-as="err">
+                                                <li t-esc="err"/>
+                                            </t>
+                                        </ul>
+                                    </div>
+                                </t>
+
+                                <form action="/my/time_off/new" method="post" enctype="multipart/form-data" class="portal-time-off-form">
+                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                                    <!-- 1. Leave Type Selector -->
+                                    <div class="mb-4">
+                                        <label for="holiday_status_id" class="form-label fw-bold">Time Off Type <span class="text-danger">*</span></label>
+                                        <select class="form-select form-select-lg" id="holiday_status_id" name="holiday_status_id" required="required">
+                                            <option value="" disabled="disabled" selected="selected">-- Select Leave Type --</option>
+                                            <t t-foreach="leave_types" t-as="lt">
+                                                <t t-set="b_match" t-value="balances_by_type.get(lt.id) if balances_by_type else None"/>
+                                                <option t-att-value="lt.id"
+                                                        t-att-data-unit="lt.request_unit"
+                                                        t-att-data-support-doc="lt.support_document"
+                                                        t-att-data-remaining="b_match['remaining'] if b_match else 0"
+                                                        t-att-selected="'selected' if (post and str(post.get('holiday_status_id')) == str(lt.id)) or (request.params.get('type_id') == str(lt.id)) else None">
+                                                    <t t-esc="lt.name"/>
+                                                    <t t-if="b_match and b_match['requires_allocation']">
+                                                        (<t t-esc="b_match['remaining']"/> <t t-esc="'hours' if lt.request_unit == 'hour' else 'days'"/> remaining)
+                                                    </t>
+                                                </option>
+                                            </t>
+                                        </select>
+                                        <div id="leave_type_balance_indicator" class="mt-2 text-muted small"></div>
+                                    </div>
+
+                                    <div class="row g-3 mb-3">
+                                        <!-- 2. Date From -->
+                                        <div class="col-12 col-md-6">
+                                            <label for="date_from" class="form-label fw-bold">Start Date <span class="text-danger">*</span></label>
+                                            <input type="date" class="form-control" id="date_from" name="date_from"
+                                                   t-att-value="post.get('date_from', today)" required="required"/>
+                                        </div>
+
+                                        <!-- 3. Date To -->
+                                        <div class="col-12 col-md-6" id="date_to_wrapper">
+                                            <label for="date_to" class="form-label fw-bold">End Date <span class="text-danger">*</span></label>
+                                            <input type="date" class="form-control" id="date_to" name="date_to"
+                                                   t-att-value="post.get('date_to', today)" required="required"/>
+                                        </div>
+                                    </div>
+
+                                    <!-- 4. Half Day / Custom Period Options -->
+                                    <div class="mb-3 p-3 bg-light rounded-3 border">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" id="request_unit_half" name="request_unit_half"
+                                                   t-att-checked="'checked' if post.get('request_unit_half') else None"/>
+                                            <label class="form-check-label fw-bold" for="request_unit_half">Half Day Only (0.5 Day)</label>
+                                        </div>
+
+                                        <div id="half_day_options" class="ms-4 mt-2" style="display: none;">
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input" type="radio" name="request_date_from_period" id="period_am" value="am" checked="checked"/>
+                                                <label class="form-check-label" for="period_am">Morning (AM)</label>
+                                            </div>
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input" type="radio" name="request_date_from_period" id="period_pm" value="pm"/>
+                                                <label class="form-check-label" for="period_pm">Afternoon (PM)</label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 5. Description / Reason -->
+                                    <div class="mb-3">
+                                        <label for="name" class="form-label fw-bold">Reason / Notes</label>
+                                        <textarea class="form-control" id="name" name="name" rows="3" placeholder="Optional notes for your manager and HR..."><t t-esc="post.get('name', '')"/></textarea>
+                                    </div>
+
+                                    <!-- 6. Attachment Upload -->
+                                    <div class="mb-4">
+                                        <label for="attachment" class="form-label fw-bold">
+                                            Attachment / Supporting Document
+                                            <span id="doc_required_badge" class="badge bg-danger ms-1" style="display: none;">Mandatory</span>
+                                        </label>
+                                        <input class="form-control" type="file" id="attachment" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"/>
+                                        <div class="form-text text-muted small">Upload medical certificate, travel itinerary, or justification document (Max 10MB).</div>
+                                    </div>
+
+                                    <!-- 7. Approver Routing Preview -->
+                                    <div class="alert alert-info py-2 px-3 small rounded-3 mb-4">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <i class="fa fa-info-circle fa-lg"/>
+                                            <div>
+                                                <strong>Approval Route:</strong> 
+                                                <span>Manager: <strong t-esc="employee.parent_id.name or 'Direct Manager'"/></span>
+                                                <t t-if="employee.time_off_officer_id">
+                                                    <span> &amp;rarr; HR Officer: <strong t-esc="employee.time_off_officer_id.name"/></span>
+                                                </t>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Form Action Buttons -->
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <a href="/my/time_off" class="btn btn-outline-secondary">
+                                            <i class="fa fa-arrow-left me-1"/> Cancel
+                                        </a>
+                                        <button type="submit" class="btn btn-primary px-4 py-2 fw-bold shadow-sm">
+                                            <i class="fa fa-paper-plane me-1"/> Submit Request
+                                        </button>
+                                    </div>
+
+                                </form>
+
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </t>
+    </template>
+
+    <!-- ================================================================= -->
+    <!-- 5. Single Time Off Details View & Chatter                         -->
+    <!-- ================================================================= -->
+
+    <template id="portal_my_time_off_detail" name="Time Off Request Details">
+        <t t-call="portal.portal_layout">
+            <div class="container py-4">
+
+                <!-- Submission Success Banner -->
+                <t t-if="submitted">
+                    <div class="alert alert-success alert-dismissible fade show shadow-sm rounded-3 mb-4" role="alert">
+                        <h5 class="alert-heading fw-bold mb-1"><i class="fa fa-check-circle me-2"/>Request Submitted Successfully!</h5>
+                        <p class="mb-0">Your time off request has been dispatched to your manager for approval.</p>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"/>
+                    </div>
+                </t>
+
+                <div class="row g-4">
+                    <div class="col-12 col-lg-8">
+
+                        <!-- Main Details Card -->
+                        <div class="card border-0 shadow-sm rounded-3 mb-4">
+                            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0 fw-bold text-primary">
+                                    <i class="fa fa-calendar-o me-2"/>Time Off Request Details
+                                </h5>
+                                <t t-if="leave.portal_state == 'approved'">
+                                    <span class="badge bg-success fs-6 px-3 py-2">Approved</span>
+                                </t>
+                                <t t-elif="leave.portal_state == 'pending_manager'">
+                                    <span class="badge bg-warning text-dark fs-6 px-3 py-2">To Approve by Manager</span>
+                                </t>
+                                <t t-elif="leave.portal_state == 'pending_hr'">
+                                    <span class="badge bg-info text-dark fs-6 px-3 py-2">To Approve by HR</span>
+                                </t>
+                                <t t-elif="leave.portal_state == 'refused'">
+                                    <span class="badge bg-danger fs-6 px-3 py-2">Refused</span>
+                                </t>
+                                <t t-elif="leave.portal_state == 'cancelled'">
+                                    <span class="badge bg-secondary fs-6 px-3 py-2">Cancelled</span>
+                                </t>
+                            </div>
+
+                            <div class="card-body p-4">
+
+                                <!-- Visual Progress Stepper -->
+                                <div class="stepper-wrapper mb-4">
+                                    <div class="stepper-item completed">
+                                        <div class="step-counter"><i class="fa fa-check"/></div>
+                                        <div class="step-name">Submitted</div>
+                                    </div>
+                                    <div t-attf-class="stepper-item {{ 'completed' if leave.manager_approved or leave.portal_state == 'approved' else ('active' if leave.portal_state == 'pending_manager' else '') }}">
+                                        <div class="step-counter">
+                                            <i t-if="leave.manager_approved or leave.portal_state == 'approved'" class="fa fa-check"/>
+                                            <span t-else="">2</span>
+                                        </div>
+                                        <div class="step-name">Manager Approval</div>
+                                    </div>
+                                    <div t-attf-class="stepper-item {{ 'completed' if leave.portal_state == 'approved' else ('active' if leave.portal_state == 'pending_hr' else '') }}">
+                                        <div class="step-counter">
+                                            <i t-if="leave.portal_state == 'approved'" class="fa fa-check"/>
+                                            <span t-else="">3</span>
+                                        </div>
+                                        <div class="step-name">HR Confirmation</div>
+                                    </div>
+                                </div>
+
+                                <!-- Key Attributes Grid -->
+                                <div class="row g-3 mb-4">
+                                    <div class="col-6 col-md-4">
+                                        <div class="text-muted small">Employee</div>
+                                        <div class="fw-bold text-dark" t-esc="leave.employee_id.name"/>
+                                    </div>
+                                    <div class="col-6 col-md-4">
+                                        <div class="text-muted small">Leave Type</div>
+                                        <div class="fw-bold text-primary" t-esc="leave.holiday_status_id.name"/>
+                                    </div>
+                                    <div class="col-6 col-md-4">
+                                        <div class="text-muted small">Duration</div>
+                                        <div class="fw-bold fs-5 text-dark">
+                                            <t t-if="leave.holiday_status_id.request_unit == 'hour'">
+                                                <t t-esc="leave.number_of_hours"/> Hours
+                                            </t>
+                                            <t t-else="">
+                                                <t t-esc="leave.number_of_days"/> Days
+                                            </t>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4">
+                                        <div class="text-muted small">From</div>
+                                        <div class="fw-bold text-dark">
+                                            <t t-esc="leave.request_date_from"/>
+                                            <t t-if="leave.request_unit_half">
+                                                (<t t-esc="'Morning' if leave.request_date_from_period == 'am' else 'Afternoon'"/>)
+                                            </t>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4">
+                                        <div class="text-muted small">To</div>
+                                        <div class="fw-bold text-dark"><t t-esc="leave.request_date_to or leave.request_date_from"/></div>
+                                    </div>
+                                    <div class="col-6 col-md-4">
+                                        <div class="text-muted small">Department</div>
+                                        <div class="fw-bold text-dark"><t t-esc="leave.employee_id.department_id.name or '-'"/></div>
+                                    </div>
+                                </div>
+
+                                <!-- Reason -->
+                                <div class="mb-4">
+                                    <div class="text-muted small mb-1">Reason / Description:</div>
+                                    <div class="p-3 bg-light rounded-3 text-dark">
+                                        <t t-esc="leave.name or 'No description provided.'"/>
+                                    </div>
+                                </div>
+
+                                <!-- Refusal Reason (if refused) -->
+                                <t t-if="leave.portal_state == 'refused'">
+                                    <div class="alert alert-danger rounded-3 mb-4">
+                                        <h6 class="fw-bold mb-1"><i class="fa fa-times-circle me-1"/> Refusal Reason:</h6>
+                                        <p class="mb-0" t-esc="leave.refusal_reason or 'No reason provided.'"/>
+                                    </div>
+                                </t>
+
+                                <!-- Attachments -->
+                                <t t-set="attachments" t-value="request.env['ir.attachment'].sudo().search([('res_model', '=', 'hr.leave'), ('res_id', '=', leave.id)])"/>
+                                <t t-if="attachments">
+                                    <div class="mb-4">
+                                        <div class="text-muted small mb-2">Supporting Documents:</div>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <t t-foreach="attachments" t-as="att">
+                                                <a t-attf-href="/web/content/{{ att.id }}?download=true" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2" target="_blank">
+                                                    <i class="fa fa-file-text-o text-primary"/>
+                                                    <span t-esc="att.name"/>
+                                                    <i class="fa fa-download ms-1"/>
+                                                </a>
+                                            </t>
+                                        </div>
+                                    </div>
+                                </t>
+
+                            </div>
+
+                            <!-- Actions Footer -->
+                            <div class="card-footer bg-light py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <a href="/my/time_off" class="btn btn-outline-secondary">
+                                    <i class="fa fa-arrow-left me-1"/> Back to List
+                                </a>
+
+                                <div class="d-flex gap-2">
+                                    <!-- Employee Cancel Option -->
+                                    <t t-if="is_owner and leave.portal_state in ('draft', 'pending_manager', 'pending_hr')">
+                                        <form t-attf-action="/my/time_off/{{ leave.id }}/cancel" method="post">
+                                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                            <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Are you sure you want to cancel this request?');">
+                                                <i class="fa fa-times me-1"/> Cancel Request
+                                            </button>
+                                        </form>
+                                    </t>
+
+                                    <!-- Manager Quick Approvals from Details View -->
+                                    <t t-if="(is_manager or is_officer) and leave.portal_state in ('pending_manager', 'pending_hr')">
+                                        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" t-attf-data-bs-target="#refuseModal{{ leave.id }}">
+                                            <i class="fa fa-times me-1"/> Refuse
+                                        </button>
+                                        <form t-attf-action="/my/time_off/{{ leave.id }}/approve" method="post">
+                                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                            <button type="submit" class="btn btn-success fw-bold px-3">
+                                                <i class="fa fa-check me-1"/> Approve Request
+                                            </button>
+                                        </form>
+                                    </t>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Chatter / Message Thread -->
+                        <div class="card border-0 shadow-sm rounded-3">
+                            <div class="card-header bg-white py-3 border-bottom">
+                                <h5 class="mb-0 fw-bold text-secondary">
+                                    <i class="fa fa-comments-o me-2 text-primary"/>Communication History &amp; Notes
+                                </h5>
+                            </div>
+                            <div class="card-body p-4">
+                                <t t-call="portal.message_thread">
+                                    <t t-set="object" t-value="leave"/>
+                                </t>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Right Sidebar -->
+                    <div class="col-12 col-lg-4">
+
+                        <!-- Approver Hierarchy Info Card -->
+                        <div class="card border-0 shadow-sm rounded-3 mb-4">
+                            <div class="card-header bg-white py-3 border-bottom">
+                                <h6 class="mb-0 fw-bold text-secondary">
+                                    <i class="fa fa-sitemap me-2 text-primary"/>Approval Hierarchy
+                                </h6>
+                            </div>
+                            <div class="card-body p-3">
+                                <div class="d-flex align-items-center gap-3 mb-3">
+                                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle p-2">
+                                        <i class="fa fa-user fa-lg"/>
+                                    </div>
+                                    <div>
+                                        <div class="text-muted small">Direct Manager</div>
+                                        <div class="fw-bold" t-esc="leave.employee_id.parent_id.name or 'Not Assigned'"/>
+                                        <t t-if="leave.manager_approved">
+                                            <span class="badge bg-success-subtle text-success small">✓ Approved (<t t-esc="leave.manager_approval_date"/>)</span>
+                                        </t>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="bg-success bg-opacity-10 text-success rounded-circle p-2">
+                                        <i class="fa fa-id-badge fa-lg"/>
+                                    </div>
+                                    <div>
+                                        <div class="text-muted small">Time Off Officer (HR)</div>
+                                        <div class="fw-bold" t-esc="leave.employee_id.time_off_officer_id.name or 'HR Officer'"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Employee Info Card -->
+                        <div class="card border-0 shadow-sm rounded-3">
+                            <div class="card-header bg-white py-3 border-bottom">
+                                <h6 class="mb-0 fw-bold text-secondary">
+                                    <i class="fa fa-user-circle me-2 text-primary"/>Employee Summary
+                                </h6>
+                            </div>
+                            <div class="card-body p-3">
+                                <p class="mb-1"><strong>Name:</strong> <span t-esc="leave.employee_id.name"/></p>
+                                <p class="mb-1"><strong>Work Email:</strong> <span t-esc="leave.employee_id.work_email or '-'"/></p>
+                                <p class="mb-0"><strong>Department:</strong> <span t-esc="leave.employee_id.department_id.name or '-'"/></p>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Refuse Modal -->
+                <div class="modal fade" t-attf-id="refuseModal{{ leave.id }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form t-attf-action="/my/time_off/{{ leave.id }}/refuse" method="post">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <div class="modal-header bg-danger text-white">
+                                    <h5 class="modal-title fw-bold"><i class="fa fa-times-circle me-2"/>Refuse Time Off Request</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"/>
+                                </div>
+                                <div class="modal-body p-4">
+                                    <p>Please enter the reason for refusing this time off request for <strong><t t-esc="leave.employee_id.name"/></strong>:</p>
+                                    <div class="mb-3">
+                                        <label for="refusal_reason" class="form-label fw-bold">Refusal Reason</label>
+                                        <textarea class="form-control" name="refusal_reason" id="refusal_reason" rows="3" required="required" placeholder="Provide clear feedback on why this request is refused..."></textarea>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-danger fw-bold">Confirm Refusal</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </t>
+    </template>
+
+    <!-- ================================================================= -->
+    <!-- 6. Portal Manager: Time Off to Approve Dashboard                  -->
+    <!-- ================================================================= -->
+
+    <template id="portal_my_time_off_to_approve" name="Portal Manager: Time Off to Approve">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <div class="container-fluid px-0 py-3">
+
+                <!-- Header -->
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+                    <div>
+                        <h2 class="fw-bold mb-1 text-primary">
+                            <i class="fa fa-users me-2"/>Team Time Off Approvals
+                        </h2>
+                        <p class="text-muted mb-0">Review and approve time off requests for your team members</p>
+                    </div>
+                    <div>
+                        <a href="/my/time_off" class="btn btn-outline-primary">
+                            <i class="fa fa-arrow-left me-1"/> My Personal Time Off
+                        </a>
+                    </div>
+                </div>
+
+                <!-- KPI Cards -->
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-md-6">
+                        <div class="card border-0 shadow-sm rounded-3 bg-gradient bg-warning text-dark p-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="small text-uppercase fw-bold text-dark opacity-75">Pending Your Approval</div>
+                                    <div class="display-6 fw-bold my-1"><t t-esc="pending_approval_count"/></div>
+                                    <div class="small opacity-75">Requests requiring immediate action</div>
+                                </div>
+                                <div class="bg-white bg-opacity-25 rounded-circle p-3">
+                                    <i class="fa fa-bell-o fa-2x text-dark"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="card border-0 shadow-sm rounded-3 bg-white p-3 border-start border-primary border-4">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="text-muted small text-uppercase fw-bold">Team Members</div>
+                                    <div class="display-6 fw-bold my-1 text-primary"><t t-esc="len(subordinates)"/></div>
+                                    <div class="small text-muted">Direct &amp; indirect subordinates</div>
+                                </div>
+                                <div class="bg-primary bg-opacity-10 rounded-circle p-3">
+                                    <i class="fa fa-user-plus fa-2x text-primary"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Team Requests Table -->
+                <div class="card border-0 shadow-sm rounded-3">
+                    <div class="card-header bg-white py-3 border-bottom d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                        <h5 class="mb-0 fw-bold text-secondary">
+                            <i class="fa fa-list me-2 text-primary"/>Team Requests
+                        </h5>
+                        <!-- Filter and Sorting -->
+                        <div class="d-flex gap-2 align-items-center">
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                    <i class="fa fa-filter me-1"/> Filter: <span t-esc="filters[filterby]['label']"/>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <t t-foreach="filters" t-as="f_key">
+                                        <li>
+                                            <a class="dropdown-item" t-attf-href="/my/time_off/to_approve?filterby={{ f_key }}&amp;sortby={{ sortby }}" t-esc="filters[f_key]['label']"/>
+                                        </li>
+                                    </t>
+                                </ul>
+                            </div>
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                    <i class="fa fa-sort me-1"/> Sort: <span t-esc="sortings[sortby]['label']"/>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <t t-foreach="sortings" t-as="s_key">
+                                        <li>
+                                            <a class="dropdown-item" t-attf-href="/my/time_off/to_approve?sortby={{ s_key }}&amp;filterby={{ filterby }}" t-esc="sortings[s_key]['label']"/>
+                                        </li>
+                                    </t>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-body p-0">
+                        <t t-if="not leaves">
+                            <div class="text-center py-5 text-muted">
+                                <i class="fa fa-check-circle-o fa-3x mb-3 text-success"/>
+                                <p class="mb-0">No time off requests waiting for your approval.</p>
+                            </div>
+                        </t>
+                        <t t-else="">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Employee</th>
+                                            <th>Leave Type</th>
+                                            <th>Dates</th>
+                                            <th>Duration</th>
+                                            <th>Reason</th>
+                                            <th>Status</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="leaves" t-as="req">
+                                            <tr>
+                                                <td>
+                                                    <div class="fw-bold text-dark" t-esc="req.employee_id.name"/>
+                                                    <div class="small text-muted" t-esc="req.employee_id.department_id.name or ''"/>
+                                                </td>
+                                                <td>
+                                                    <span class="fw-semibold text-primary" t-esc="req.holiday_status_id.name"/>
+                                                </td>
+                                                <td>
+                                                    <span t-esc="req.request_date_from"/> &amp;rarr; <span t-esc="req.request_date_to or req.request_date_from"/>
+                                                </td>
+                                                <td>
+                                                    <span class="fw-bold">
+                                                        <t t-if="req.holiday_status_id.request_unit == 'hour'">
+                                                            <t t-esc="req.number_of_hours"/> hrs
+                                                        </t>
+                                                        <t t-else="">
+                                                            <t t-esc="req.number_of_days"/> days
+                                                        </t>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span class="text-truncate d-inline-block text-muted" style="max-width: 180px;" t-esc="req.name or '-'"/>
+                                                </td>
+                                                <td>
+                                                    <t t-if="req.portal_state == 'approved'">
+                                                        <span class="badge rounded-pill bg-success px-3 py-1">Approved</span>
+                                                    </t>
+                                                    <t t-elif="req.portal_state == 'pending_manager'">
+                                                        <span class="badge rounded-pill bg-warning text-dark px-3 py-1">Pending My Approval</span>
+                                                    </t>
+                                                    <t t-elif="req.portal_state == 'pending_hr'">
+                                                        <span class="badge rounded-pill bg-info text-dark px-3 py-1">Pending HR Confirmation</span>
+                                                    </t>
+                                                    <t t-elif="req.portal_state == 'refused'">
+                                                        <span class="badge rounded-pill bg-danger px-3 py-1">Refused</span>
+                                                    </t>
+                                                    <t t-else="">
+                                                        <span class="badge rounded-pill bg-light text-dark border px-3 py-1" t-esc="req.state"/>
+                                                    </t>
+                                                </td>
+                                                <td class="text-end">
+                                                    <div class="d-inline-flex gap-1">
+                                                        <a t-attf-href="/my/time_off/{{ req.id }}" class="btn btn-sm btn-outline-secondary" title="View Details">
+                                                            <i class="fa fa-eye"/>
+                                                        </a>
+
+                                                        <!-- Quick Approve & Refuse Buttons for Manager -->
+                                                        <t t-if="not req.manager_approved and req.portal_state in ('pending_manager', 'pending_hr')">
+                                                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" t-attf-data-bs-target="#teamRefuseModal{{ req.id }}" title="Refuse">
+                                                                <i class="fa fa-times"/>
+                                                            </button>
+                                                            <form t-attf-action="/my/time_off/{{ req.id }}/approve" method="post" class="d-inline">
+                                                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                                <input type="hidden" name="redirect_to" value="to_approve"/>
+                                                                <button type="submit" class="btn btn-sm btn-success" title="Approve">
+                                                                    <i class="fa fa-check"/> Approve
+                                                                </button>
+                                                            </form>
+                                                        </t>
+                                                    </div>
+                                                </td>
+                                            </tr>
+
+                                            <!-- Refuse Modal per row -->
+                                            <div class="modal fade" t-attf-id="teamRefuseModal{{ req.id }}" tabindex="-1" aria-hidden="true">
+                                                <div class="modal-dialog">
+                                                    <div class="modal-content">
+                                                        <form t-attf-action="/my/time_off/{{ req.id }}/refuse" method="post">
+                                                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                            <input type="hidden" name="redirect_to" value="to_approve"/>
+                                                            <div class="modal-header bg-danger text-white">
+                                                                <h5 class="modal-title fw-bold"><i class="fa fa-times-circle me-2"/>Refuse Request: <t t-esc="req.employee_id.name"/></h5>
+                                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"/>
+                                                            </div>
+                                                            <div class="modal-body p-4 text-start">
+                                                                <p>Please enter the reason for refusing this time off request:</p>
+                                                                <div class="mb-3">
+                                                                    <label class="form-label fw-bold">Refusal Reason</label>
+                                                                    <textarea class="form-control" name="refusal_reason" rows="3" required="required" placeholder="Reason for refusal..."></textarea>
+                                                                </div>
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                                <button type="submit" class="btn btn-danger fw-bold">Confirm Refusal</button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </t>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div t-if="pager['page_count'] &gt; 1" class="card-footer bg-white d-flex justify-content-center py-3">
+                        <t t-call="portal.pager"/>
+                    </div>
+                </div>
+
+            </div>
+        </t>
+    </template>
+
+</odoo>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Inherit Leave Form View to display Portal and Manager Approval Details -->
+    <record id="hr_leave_view_form_inherit_portal" model="ir.ui.view">
+        <field name="name">hr.leave.form.inherit.portal</field>
+        <field name="model">hr.leave</field>
+        <field name="inherit_id" ref="hr_holidays.hr_leave_view_form"/>
+        <field name="priority">30</field>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <group string="Portal &amp; Manager Approval" name="portal_approval_info" invisible="not is_portal_submitted and not manager_approved">
+                    <group>
+                        <field name="is_portal_submitted" readonly="1"/>
+                        <field name="portal_state" readonly="1" widget="badge" decoration-info="portal_state in ('pending_manager', 'pending_hr')" decoration-success="portal_state == 'approved'" decoration-danger="portal_state == 'refused'" decoration-muted="portal_state == 'cancelled'"/>
+                    </group>
+                    <group>
+                        <field name="manager_approved" readonly="1"/>
+                        <field name="manager_approved_by_id" readonly="1" invisible="not manager_approved"/>
+                        <field name="manager_approval_date" readonly="1" invisible="not manager_approved"/>
+                        <field name="refusal_reason" readonly="1" invisible="not refusal_reason"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Inherit Leave Type Form View to add is_portal_visible -->
+    <record id="edit_holiday_status_form_inherit_portal" model="ir.ui.view">
+        <field name="name">hr.leave.type.form.inherit.portal</field>
+        <field name="model">hr.leave.type</field>
+        <field name="inherit_id" ref="hr_holidays.edit_holiday_status_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='active']" position="after">
+                <field name="is_portal_visible"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
