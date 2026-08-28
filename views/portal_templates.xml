@@ -10,15 +10,19 @@
             <t t-call="portal.portal_docs_entry">
                 <t t-set="icon" t-value="'/time_off_portal_exposure/static/src/img/calendar.svg'"/>
                 <t t-set="title">My Time Off</t>
+                <t t-set="text">Request leaves and view balances</t>
                 <t t-set="url" t-value="'/my/time_off'"/>
+                <t t-set="config_card" t-value="True"/>
                 <t t-set="placeholder_count" t-value="'time_off_count'"/>
             </t>
             <t t-if="time_off_to_approve_count is not None and time_off_to_approve_count &gt; 0">
                 <t t-call="portal.portal_docs_entry">
                     <t t-set="icon" t-value="'/time_off_portal_exposure/static/src/img/check-circle.svg'"/>
                     <t t-set="title">Time Off to Approve</t>
+                    <t t-set="text">Review subordinate leave requests</t>
                     <t t-set="url" t-value="'/my/time_off/to_approve'"/>
                     <t t-set="count" t-value="time_off_to_approve_count"/>
+                    <t t-set="config_card" t-value="True"/>
                 </t>
             </t>
         </xpath>
