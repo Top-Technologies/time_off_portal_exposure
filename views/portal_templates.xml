@@ -5,6 +5,32 @@
     <!-- 1. Portal Home Cards & Breadcrumbs                                -->
     <!-- ================================================================= -->
 
+    <template id="portal_my_home_approval_alerts_time_off" name="Portal My Home : Time Off Approval Alert" inherit_id="portal.portal_my_home" priority="20">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="before">
+            <t t-if="time_off_to_approve_count and time_off_to_approve_count &gt; 0">
+                <div class="alert alert-primary border-primary d-flex flex-column flex-md-row align-items-md-center justify-content-between p-3 rounded-3 shadow-sm mb-4 alert-approval-pulse">
+                    <div class="d-flex align-items-center gap-3 mb-2 mb-md-0">
+                        <div class="bg-primary text-white rounded-circle p-2 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 44px; height: 44px;">
+                            <i class="fa fa-bell fa-lg"/>
+                        </div>
+                        <div>
+                            <h6 class="mb-0 fw-bold text-primary">
+                                <span class="badge bg-danger me-2">Action Required</span>
+                                You have <t t-esc="time_off_to_approve_count"/> Time Off request<t t-if="time_off_to_approve_count &gt; 1">s</t> awaiting your approval!
+                            </h6>
+                            <div class="text-muted small">
+                                Subordinate employees have submitted leave requests requiring your manager review.
+                            </div>
+                        </div>
+                    </div>
+                    <a href="/my/time_off/to_approve" class="btn btn-primary fw-bold px-3 py-2 text-nowrap shadow-sm">
+                        <i class="fa fa-check-circle me-1"/> Review Time Off &#8594;
+                    </a>
+                </div>
+            </t>
+        </xpath>
+    </template>
+
     <template id="portal_my_home_time_off" name="Portal My Home : Time Off Entries" inherit_id="portal.portal_my_home" priority="40">
         <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
             <t t-call="portal.portal_docs_entry">
@@ -12,8 +38,8 @@
                 <t t-set="title">My Time Off</t>
                 <t t-set="text">Request leaves and view balances</t>
                 <t t-set="url" t-value="'/my/time_off'"/>
+                <t t-set="count" t-value="time_off_count"/>
                 <t t-set="config_card" t-value="True"/>
-                <t t-set="placeholder_count" t-value="'time_off_count'"/>
             </t>
             <t t-if="time_off_to_approve_count is not None and time_off_to_approve_count &gt; 0">
                 <t t-call="portal.portal_docs_entry">
@@ -371,7 +397,7 @@
                                     </div>
                                 </t>
 
-                                <form action="/my/time_off/new" method="post" enctype="multipart/form-data" class="portal-time-off-form">
+                                <form action="/my/time_off/new" method="post" enctype="multipart/form-data" class="portal-time-off-form" id="time_off_application_form">
                                     <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
                                     <!-- 1. Leave Type Selector -->
@@ -384,11 +410,12 @@
                                                 <option t-att-value="lt.id"
                                                         t-att-data-unit="lt.request_unit"
                                                         t-att-data-support-doc="lt.support_document"
-                                                        t-att-data-remaining="b_match['remaining'] if b_match else 0"
+                                                        t-att-data-requires-alloc="lt.requires_allocation"
+                                                        t-att-data-remaining="b_match['virtual_remaining'] if b_match else 0"
                                                         t-att-selected="'selected' if (post and str(post.get('holiday_status_id')) == str(lt.id)) or (request.params.get('type_id') == str(lt.id)) else None">
                                                     <t t-esc="lt.name"/>
                                                     <t t-if="b_match and b_match['requires_allocation']">
-                                                        (<t t-esc="b_match['remaining']"/> <t t-esc="'hours' if lt.request_unit == 'hour' else 'days'"/> remaining)
+                                                        (<t t-esc="b_match['virtual_remaining']"/> <t t-esc="'hours' if lt.request_unit == 'hour' else 'days'"/> available)
                                                     </t>
                                                 </option>
                                             </t>
@@ -477,6 +504,17 @@
                             </div>
                         </div>
 
+                    </div>
+                </div>
+
+                <!-- Processing Overlay Loader -->
+                <div id="time_off_processing_overlay" class="portal-processing-overlay">
+                    <div class="portal-processing-card">
+                        <div class="spinner-border text-primary mb-3" style="width: 3.5rem; height: 3.5rem;" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <h4 class="fw-bold mb-2 text-dark" id="processing_loader_title">Submitting Request...</h4>
+                        <p class="text-muted mb-0" id="processing_loader_text">Please wait while your time off request is received and dispatched to your manager...</p>
                     </div>
                 </div>
 
@@ -753,6 +791,17 @@
                     </div>
                 </div>
 
+                <!-- Processing Overlay Loader -->
+                <div id="time_off_processing_overlay" class="portal-processing-overlay">
+                    <div class="portal-processing-card">
+                        <div class="spinner-border text-primary mb-3" style="width: 3.5rem; height: 3.5rem;" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <h4 class="fw-bold mb-2 text-dark" id="processing_loader_title">Processing Action...</h4>
+                        <p class="text-muted mb-0" id="processing_loader_text">Please wait while the system updates the request and notifies parties...</p>
+                    </div>
+                </div>
+
             </div>
         </t>
     </template>
@@ -973,6 +1022,17 @@
                     <!-- Pagination -->
                     <div t-if="pager['page_count'] &gt; 1" class="card-footer bg-white d-flex justify-content-center py-3">
                         <t t-call="portal.pager"/>
+                    </div>
+                </div>
+
+                <!-- Processing Overlay Loader -->
+                <div id="time_off_processing_overlay" class="portal-processing-overlay">
+                    <div class="portal-processing-card">
+                        <div class="spinner-border text-primary mb-3" style="width: 3.5rem; height: 3.5rem;" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <h4 class="fw-bold mb-2 text-dark" id="processing_loader_title">Processing Decision...</h4>
+                        <p class="text-muted mb-0" id="processing_loader_text">Please wait while the system registers your decision and notifies the employee...</p>
                     </div>
                 </div>
 

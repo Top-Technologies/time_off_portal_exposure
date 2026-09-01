@@ -18,21 +18,22 @@ class TimeOffCustomerPortal(CustomerPortal):
         employee = user.get_portal_employee()
 
         if employee:
-            if 'time_off_count' in counters:
-                values['time_off_count'] = request.env['hr.leave'].sudo().search_count([
-                    ('employee_id', '=', employee.id)
-                ])
+            values['time_off_count'] = request.env['hr.leave'].sudo().search_count([
+                ('employee_id', '=', employee.id)
+            ])
 
-            if 'time_off_to_approve_count' in counters:
-                subordinates = employee.get_subordinate_employees()
-                if subordinates:
-                    values['time_off_to_approve_count'] = request.env['hr.leave'].sudo().search_count([
-                        ('employee_id', 'in', subordinates.ids),
-                        ('state', 'in', ['confirm', 'validate1']),
-                        ('manager_approved', '=', False)
-                    ])
-                else:
-                    values['time_off_to_approve_count'] = 0
+            subordinates = employee.get_subordinate_employees()
+            if subordinates:
+                values['time_off_to_approve_count'] = request.env['hr.leave'].sudo().search_count([
+                    ('employee_id', 'in', subordinates.ids),
+                    ('state', 'in', ['confirm', 'validate1']),
+                    ('manager_approved', '=', False)
+                ])
+            else:
+                values['time_off_to_approve_count'] = 0
+        else:
+            values['time_off_count'] = 0
+            values['time_off_to_approve_count'] = 0
 
         return values
 
@@ -220,6 +221,44 @@ class TimeOffCustomerPortal(CustomerPortal):
                 except Exception as e:
                     errors.append(_("Invalid date format."))
 
+            # Allocation Balance Pre-Check
+            if selected_type and not errors:
+                requires_alloc = getattr(selected_type, 'requires_allocation', 'no') == 'yes'
+                if requires_alloc:
+                    balances = employee.get_portal_leave_balances()
+                    b_match = next((b for b in balances if b['id'] == selected_type.id), None)
+                    available_balance = b_match['virtual_remaining'] if b_match else 0.0
+                    unit = 'hours' if selected_type.request_unit == 'hour' else 'days'
+
+                    if available_balance <= 0:
+                        errors.append(_("You do not have any allocated %(unit)s remaining for '%(type)s' (Available balance: 0 %(unit)s). Please request an allocation first.") % {
+                            'unit': unit,
+                            'type': selected_type.name
+                        })
+                    else:
+                        if request_unit_half:
+                            req_duration = 0.5
+                        elif request_unit_hours and request_hour_from and request_hour_to:
+                            try:
+                                req_duration = float(request_hour_to) - float(request_hour_from)
+                            except (ValueError, TypeError):
+                                req_duration = 1.0
+                        else:
+                            try:
+                                d_from = fields.Date.from_string(date_from_str)
+                                d_to = fields.Date.from_string(date_to_str) if date_to_str else d_from
+                                req_duration = max((d_to - d_from).days + 1, 1)
+                            except Exception:
+                                req_duration = 1.0
+
+                        if req_duration > available_balance:
+                            errors.append(_("The requested duration (%(req)s %(unit)s) exceeds your remaining allocated balance (%(avail)s %(unit)s) for '%(type)s'.") % {
+                                'req': req_duration,
+                                'avail': available_balance,
+                                'unit': unit,
+                                'type': selected_type.name
+                            })
+
             if not errors:
                 try:
                     leave_vals = {
@@ -261,8 +300,10 @@ class TimeOffCustomerPortal(CustomerPortal):
                     return request.redirect(f'/my/time_off/{leave.id}?submitted=1')
 
                 except (UserError, ValidationError) as e:
+                    request.env.cr.rollback()
                     errors.append(str(e))
                 except Exception as e:
+                    request.env.cr.rollback()
                     errors.append(_("An unexpected error occurred: %s") % str(e))
 
         balances = employee.get_portal_leave_balances()

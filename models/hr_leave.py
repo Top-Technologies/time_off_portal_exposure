@@ -68,6 +68,23 @@ class HrLeave(models.Model):
             else:
                 leave.portal_state = 'draft'
 
+    @api.constrains('holiday_status_id', 'employee_id', 'state')
+    def _check_portal_leave_allocation_balance(self):
+        for leave in self:
+            if leave.state in ['cancel', 'refuse']:
+                continue
+            if not leave.holiday_status_id or not leave.employee_id:
+                continue
+            requires_alloc = getattr(leave.holiday_status_id, 'requires_allocation', 'no') == 'yes'
+            if requires_alloc and leave.is_portal_submitted:
+                balances = leave.employee_id.get_portal_leave_balances()
+                b_match = next((b for b in balances if b['id'] == leave.holiday_status_id.id), None)
+                if b_match and b_match['allocated'] <= 0:
+                    raise ValidationError(_(
+                        "Cannot submit request: You have 0 allocated balance for '%(type)s'. Please request an allocation first.",
+                        type=leave.holiday_status_id.name
+                    ))
+
     def action_approve(self, check_state=True):
         """ Allow HR Officer to approve in a single click if manager already approved or HR is approving """
         leaves_to_validate = self.filtered(lambda l: l.manager_approved or self.env.user.has_group('hr_holidays.group_hr_holidays_user'))
