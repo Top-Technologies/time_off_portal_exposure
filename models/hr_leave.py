@@ -85,6 +85,18 @@ class HrLeave(models.Model):
                         type=leave.holiday_status_id.name
                     ))
 
+    def _get_durations(self, check_leave_type=True, resource_calendar=None):
+        """ Guarantee inclusive date duration for leave requests (e.g. 02/04 to 04/04 = 3 days: 02, 03, 04) """
+        result = super()._get_durations(check_leave_type=check_leave_type, resource_calendar=resource_calendar)
+        for leave in self:
+            if leave.request_date_from and leave.request_date_to and not leave.request_unit_half and not leave.request_unit_hours:
+                inclusive_days = max((leave.request_date_to - leave.request_date_from).days + 1, 1)
+                hours = result.get(leave.id, (0, 0))[1] if isinstance(result.get(leave.id), (tuple, list)) else 0.0
+                if not hours:
+                    hours = inclusive_days * 8.0
+                result[leave.id] = (float(inclusive_days), float(hours))
+        return result
+
     def action_approve(self, check_state=True):
         """ Allow HR Officer to approve in a single click if manager already approved or HR is approving """
         leaves_to_validate = self.filtered(lambda l: l.manager_approved or self.env.user.has_group('hr_holidays.group_hr_holidays_user'))

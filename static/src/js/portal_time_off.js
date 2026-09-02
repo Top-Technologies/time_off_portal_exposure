@@ -1,6 +1,11 @@
 /** @odoo-module **/
 
 function initTimeOffPortal() {
+    // 0. Remove persistent doc spinner on portal home if present
+    const docSpinners = document.querySelectorAll('.o_portal_doc_spinner');
+    docSpinners.forEach(s => s.remove());
+
+    const targetEmployeeSelect = document.getElementById('target_employee_id');
     const holidaySelect = document.getElementById('holiday_status_id');
     const halfDayCheckbox = document.getElementById('request_unit_half');
     const halfDayOptions = document.getElementById('half_day_options');
@@ -11,6 +16,16 @@ function initTimeOffPortal() {
     const balanceIndicator = document.getElementById('leave_type_balance_indicator');
     const timeOffForm = document.getElementById('time_off_application_form');
     const processingOverlay = document.getElementById('time_off_processing_overlay');
+
+    // 0. Manager Target Subordinate Switcher
+    if (targetEmployeeSelect) {
+        targetEmployeeSelect.addEventListener('change', () => {
+            const targetId = targetEmployeeSelect.value;
+            const currentUrl = new URL(window.location.href);
+            currentUrl.searchParams.set('target_id', targetId);
+            window.location.href = currentUrl.toString();
+        });
+    }
 
     // 1. Half Day Toggle Logic
     if (halfDayCheckbox) {
@@ -51,25 +66,33 @@ function initTimeOffPortal() {
                 return;
             }
 
-            const isSupportDoc = selectedOpt.getAttribute('data-support-doc') === 'True' || selectedOpt.getAttribute('data-support-doc') === 'true';
             const requiresAlloc = selectedOpt.getAttribute('data-requires-alloc') === 'yes';
             const remaining = parseFloat(selectedOpt.getAttribute('data-remaining')) || 0;
             const unit = selectedOpt.getAttribute('data-unit') === 'hour' ? 'hours' : 'days';
             const submitBtn = timeOffForm ? timeOffForm.querySelector('button[type="submit"]') : null;
 
-            if (docRequiredBadge) {
-                docRequiredBadge.style.display = isSupportDoc ? 'inline-block' : 'none';
-            }
-
             if (balanceIndicator) {
                 if (requiresAlloc && remaining <= 0) {
-                    balanceIndicator.innerHTML = `<span class="badge bg-danger p-2"><i class="fa fa-times-circle me-1"></i> No Allocated Balance (0 ${unit})</span><div class="small text-danger mt-1 fw-bold"><i class="fa fa-ban me-1"></i>You cannot submit this request without an active allocation from HR.</div>`;
+                    balanceIndicator.innerHTML = `
+                        <div class="alert alert-danger d-inline-flex align-items-center py-1 px-3 mb-0 rounded-2 fw-semibold text-danger border border-danger border-opacity-25" style="background-color: #f8d7da; color: #842029 !important;">
+                            <i class="fa fa-times-circle me-2 text-danger"></i> No Allocated Balance (0 ${unit})
+                        </div>
+                        <div class="small text-danger mt-1 fw-bold"><i class="fa fa-ban me-1"></i>You cannot submit this request without an active allocation from HR.</div>
+                    `;
                     if (submitBtn) submitBtn.disabled = true;
                 } else if (requiresAlloc) {
-                    balanceIndicator.innerHTML = `<span class="badge bg-primary bg-opacity-10 text-primary p-2"><i class="fa fa-info-circle me-1"></i> Available Balance: <strong>${remaining} ${unit}</strong></span>`;
+                    balanceIndicator.innerHTML = `
+                        <div class="alert alert-primary d-inline-flex align-items-center py-1 px-3 mb-0 rounded-2 fw-semibold text-primary border border-primary border-opacity-25" style="background-color: #cfe2ff; color: #084298 !important;">
+                            <i class="fa fa-info-circle me-2 text-primary"></i> Available Balance: <strong class="ms-1">${remaining} ${unit}</strong>
+                        </div>
+                    `;
                     if (submitBtn) submitBtn.disabled = false;
                 } else {
-                    balanceIndicator.innerHTML = `<span class="badge bg-success bg-opacity-10 text-success p-2"><i class="fa fa-check-circle me-1"></i> No Allocation Required (${unit})</span>`;
+                    balanceIndicator.innerHTML = `
+                        <div class="alert alert-success d-inline-flex align-items-center py-1 px-3 mb-0 rounded-2 fw-semibold text-success border border-success border-opacity-25" style="background-color: #d1e7dd; color: #0f5132 !important;">
+                            <i class="fa fa-check-circle me-2 text-success"></i> No Allocation Required (${unit})
+                        </div>
+                    `;
                     if (submitBtn) submitBtn.disabled = false;
                 }
             }

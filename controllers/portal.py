@@ -174,6 +174,20 @@ class TimeOffCustomerPortal(CustomerPortal):
                 'page_name': 'time_off_no_employee'
             })
 
+        subordinates = employee.get_subordinate_employees()
+        target_id_str = post.get('target_employee_id') or request.params.get('target_id')
+        target_employee = employee
+        is_subordinate_request = False
+
+        if target_id_str:
+            try:
+                t_id = int(target_id_str)
+                if subordinates and t_id in subordinates.ids:
+                    target_employee = request.env['hr.employee'].sudo().browse(t_id)
+                    is_subordinate_request = True
+            except (ValueError, TypeError):
+                target_employee = employee
+
         LeaveType = request.env['hr.leave.type'].sudo()
         leave_types = LeaveType.search([
             ('active', '=', True),
@@ -207,10 +221,6 @@ class TimeOffCustomerPortal(CustomerPortal):
             if request_unit_half:
                 date_to_str = date_from_str
 
-            # Support document required
-            if selected_type and getattr(selected_type, 'support_document', False) and not attachment:
-                errors.append(_("Supporting document (attachment) is mandatory for this Time Off Type."))
-
             if not errors:
                 try:
                     date_from = fields.Date.from_string(date_from_str)
@@ -225,7 +235,7 @@ class TimeOffCustomerPortal(CustomerPortal):
             if selected_type and not errors:
                 requires_alloc = getattr(selected_type, 'requires_allocation', 'no') == 'yes'
                 if requires_alloc:
-                    balances = employee.get_portal_leave_balances()
+                    balances = target_employee.get_portal_leave_balances()
                     b_match = next((b for b in balances if b['id'] == selected_type.id), None)
                     available_balance = b_match['virtual_remaining'] if b_match else 0.0
                     unit = 'hours' if selected_type.request_unit == 'hour' else 'days'
@@ -252,7 +262,7 @@ class TimeOffCustomerPortal(CustomerPortal):
                                 req_duration = 1.0
 
                         if req_duration > available_balance:
-                            errors.append(_("The requested duration (%(req)s %(unit)s) exceeds your remaining allocated balance (%(avail)s %(unit)s) for '%(type)s'.") % {
+                            errors.append(_("The requested duration (%(req)s %(unit)s) exceeds the remaining allocated balance (%(avail)s %(unit)s) for '%(type)s'.") % {
                                 'req': req_duration,
                                 'avail': available_balance,
                                 'unit': unit,
@@ -262,7 +272,7 @@ class TimeOffCustomerPortal(CustomerPortal):
             if not errors:
                 try:
                     leave_vals = {
-                        'employee_id': employee.id,
+                        'employee_id': target_employee.id,
                         'holiday_status_id': selected_type.id,
                         'request_date_from': date_from_str,
                         'request_date_to': date_to_str,
@@ -278,10 +288,22 @@ class TimeOffCustomerPortal(CustomerPortal):
                         leave_vals['request_hour_from'] = request_hour_from
                         leave_vals['request_hour_to'] = request_hour_to
 
+                    # Check manager status and routing
+                    has_direct_manager = bool(target_employee.parent_id or target_employee.leave_manager_id)
+                    val_type = getattr(selected_type, 'leave_validation_type', 'both')
+
+                    if is_subordinate_request or not has_direct_manager:
+                        # Manager submitted on behalf of subordinate OR requester has no assigned manager
+                        leave_vals['manager_approved'] = True
+                        leave_vals['manager_approved_by_id'] = request.env.user.id
+                        leave_vals['manager_approval_date'] = fields.Datetime.now()
+                        if is_subordinate_request:
+                            leave_vals['first_approver_id'] = employee.id
+
                     # Create the leave record as sudo
                     leave = request.env['hr.leave'].sudo().create(leave_vals)
 
-                    # Handle attachment
+                    # Handle optional attachment
                     if attachment and attachment.filename:
                         file_content = attachment.read()
                         attachment_record = request.env['ir.attachment'].sudo().create({
@@ -294,8 +316,51 @@ class TimeOffCustomerPortal(CustomerPortal):
                         if hasattr(leave, 'supported_attachment_ids'):
                             leave.sudo().write({'supported_attachment_ids': [(4, attachment_record.id)]})
 
-                    # Trigger manager notification
-                    leave._notify_manager_on_submission()
+                    # Handle Post-Creation Workflow & Routing
+                    if is_subordinate_request:
+                        leave.sudo().message_post(
+                            body=_("📋 <b>Submitted &amp; Pre-Approved by Manager:</b> %s on behalf of %s.<br/>Dispatched directly to HR Officer for review.") % (
+                                request.env.user.name,
+                                target_employee.name
+                            ),
+                            message_type='comment',
+                            subtype_xmlid='mail.mt_comment',
+                        )
+                        if val_type in ['both', 'hr']:
+                            try:
+                                leave.sudo().write({'state': 'validate1'})
+                            except Exception:
+                                pass
+                            leave._notify_time_off_officer()
+                        else:
+                            try:
+                                leave.sudo().action_validate()
+                            except Exception:
+                                leave.sudo().write({'state': 'validate'})
+
+                    elif not has_direct_manager:
+                        leave.sudo().message_post(
+                            body=_("ℹ️ <b>Direct Routing:</b> %s has no manager assigned.<br/>Request dispatched directly to HR Officer for review.") % (
+                                target_employee.name
+                            ),
+                            message_type='comment',
+                            subtype_xmlid='mail.mt_comment',
+                        )
+                        if val_type in ['both', 'hr']:
+                            try:
+                                leave.sudo().write({'state': 'validate1'})
+                            except Exception:
+                                pass
+                            leave._notify_time_off_officer()
+                        else:
+                            try:
+                                leave.sudo().action_validate()
+                            except Exception:
+                                leave.sudo().write({'state': 'validate'})
+
+                    else:
+                        # Standard workflow: notify direct manager
+                        leave._notify_manager_on_submission()
 
                     return request.redirect(f'/my/time_off/{leave.id}?submitted=1')
 
@@ -306,12 +371,16 @@ class TimeOffCustomerPortal(CustomerPortal):
                     request.env.cr.rollback()
                     errors.append(_("An unexpected error occurred: %s") % str(e))
 
-        balances = employee.get_portal_leave_balances()
+        balances = target_employee.get_portal_leave_balances()
         balances_by_type = {b['id']: b for b in balances}
 
         values = {
             'page_name': 'time_off_new',
             'employee': employee,
+            'target_employee': target_employee,
+            'subordinates': subordinates,
+            'selected_target_id': str(target_employee.id),
+            'is_subordinate_request': is_subordinate_request,
             'leave_types': leave_types,
             'balances': balances,
             'balances_by_type': balances_by_type,

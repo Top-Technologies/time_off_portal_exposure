@@ -400,6 +400,29 @@
                                 <form action="/my/time_off/new" method="post" enctype="multipart/form-data" class="portal-time-off-form" id="time_off_application_form">
                                     <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
+                                    <!-- 0. Manager Subordinate Selection (If User is a Manager) -->
+                                    <t t-if="subordinates and len(subordinates) &gt; 0">
+                                        <div class="mb-4 p-3 bg-light rounded-3 border">
+                                            <label for="target_employee_id" class="form-label fw-bold text-dark">
+                                                <i class="fa fa-users text-primary me-1"/> Requesting Time Off For:
+                                            </label>
+                                            <select class="form-select border-primary" id="target_employee_id" name="target_employee_id">
+                                                <option t-att-value="employee.id" t-att-selected="'selected' if not selected_target_id or selected_target_id == str(employee.id) else None">
+                                                    Myself (<t t-esc="employee.name"/> - <t t-esc="employee.job_title or 'Self'"/>)
+                                                </option>
+                                                <t t-foreach="subordinates" t-as="sub">
+                                                    <option t-att-value="sub.id" t-att-selected="'selected' if selected_target_id == str(sub.id) else None">
+                                                        <t t-esc="sub.name"/> (<t t-esc="sub.job_title or 'Subordinate'"/>)
+                                                    </option>
+                                                </t>
+                                            </select>
+                                            <div class="form-text text-muted small mt-1">
+                                                <i class="fa fa-info-circle text-primary me-1"/>
+                                                As a manager, submitting on behalf of a team member automatically gives manager pre-approval and routes the request directly to the HR Officer.
+                                            </div>
+                                        </div>
+                                    </t>
+
                                     <!-- 1. Leave Type Selector -->
                                     <div class="mb-4">
                                         <label for="holiday_status_id" class="form-label fw-bold">Time Off Type <span class="text-danger">*</span></label>
@@ -420,7 +443,7 @@
                                                 </option>
                                             </t>
                                         </select>
-                                        <div id="leave_type_balance_indicator" class="mt-2 text-muted small"></div>
+                                        <div id="leave_type_balance_indicator" class="mt-2"></div>
                                     </div>
 
                                     <div class="row g-3 mb-3">
@@ -436,6 +459,7 @@
                                             <label for="date_to" class="form-label fw-bold">End Date <span class="text-danger">*</span></label>
                                             <input type="date" class="form-control" id="date_to" name="date_to"
                                                    t-att-value="post.get('date_to', today)" required="required"/>
+                                            <div class="form-text text-muted small">Inclusive date range (e.g. 02 to 04 counts 3 days).</div>
                                         </div>
                                     </div>
 
@@ -462,17 +486,17 @@
                                     <!-- 5. Description / Reason -->
                                     <div class="mb-3">
                                         <label for="name" class="form-label fw-bold">Reason / Notes</label>
-                                        <textarea class="form-control" id="name" name="name" rows="3" placeholder="Optional notes for your manager and HR..."><t t-esc="post.get('name', '')"/></textarea>
+                                        <textarea class="form-control" id="name" name="name" rows="3" placeholder="Optional notes for manager and HR..."><t t-esc="post.get('name', '')"/></textarea>
                                     </div>
 
-                                    <!-- 6. Attachment Upload -->
+                                    <!-- 6. Attachment Upload (Optional) -->
                                     <div class="mb-4">
                                         <label for="attachment" class="form-label fw-bold">
                                             Attachment / Supporting Document
-                                            <span id="doc_required_badge" class="badge bg-danger ms-1" style="display: none;">Mandatory</span>
+                                            <span class="badge bg-secondary ms-1 fw-normal">Optional</span>
                                         </label>
                                         <input class="form-control" type="file" id="attachment" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"/>
-                                        <div class="form-text text-muted small">Upload medical certificate, travel itinerary, or justification document (Max 10MB).</div>
+                                        <div class="form-text text-muted small">Upload medical certificate or supporting document if available (Optional, Max 10MB).</div>
                                     </div>
 
                                     <!-- 7. Approver Routing Preview -->
@@ -481,9 +505,17 @@
                                             <i class="fa fa-info-circle fa-lg"/>
                                             <div>
                                                 <strong>Approval Route:</strong> 
-                                                <span>Manager: <strong t-esc="employee.parent_id.name or 'Direct Manager'"/></span>
-                                                <t t-if="employee.time_off_officer_id">
-                                                    <span> &amp;rarr; HR Officer: <strong t-esc="employee.time_off_officer_id.name"/></span>
+                                                <t t-if="is_subordinate_request">
+                                                    <span>Manager Pre-Approved (<strong t-esc="employee.name"/>) &amp;rarr; HR Officer: <strong t-esc="target_employee.time_off_officer_id.name or 'Time Off Officer'"/></span>
+                                                </t>
+                                                <t t-elif="not target_employee.parent_id and not target_employee.leave_manager_id">
+                                                    <span>Direct &amp;rarr; HR Officer: <strong t-esc="target_employee.time_off_officer_id.name or 'Time Off Officer'"/> (No manager assigned)</span>
+                                                </t>
+                                                <t t-else="">
+                                                    <span>Manager: <strong t-esc="target_employee.parent_id.name or 'Direct Manager'"/></span>
+                                                    <t t-if="target_employee.time_off_officer_id">
+                                                        <span> &amp;rarr; HR Officer: <strong t-esc="target_employee.time_off_officer_id.name"/></span>
+                                                    </t>
                                                 </t>
                                             </div>
                                         </div>
