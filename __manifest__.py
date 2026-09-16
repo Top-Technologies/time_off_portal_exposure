@@ -53,6 +53,7 @@ Key Features:
     'assets': {
         'web.assets_frontend': [
             'time_off_portal_exposure/static/src/css/portal_time_off.css',
+            'time_off_portal_exposure/static/src/js/ethiopian_calendar.js',
             'time_off_portal_exposure/static/src/js/portal_time_off.js',
         ],
     },

@@ -8,6 +8,7 @@ from odoo.http import request
 from odoo.addons.portal.controllers.portal import CustomerPortal, pager as portal_pager
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.osv import expression
+from ..models.ethiopian_date_utils import ethiopian_to_gregorian, format_ethiopian_date
 
 
 class TimeOffCustomerPortal(CustomerPortal):
@@ -212,6 +213,21 @@ class TimeOffCustomerPortal(CustomerPortal):
                 errors.append(_("Please select a valid Time Off Type."))
 
             selected_type = LeaveType.browse(int(holiday_status_id)) if holiday_status_id else False
+
+            # If Gregorian date input wasn't populated but Ethiopian was submitted, convert it
+            if not date_from_str and post.get('eth_year_from') and post.get('eth_month_from') and post.get('eth_day_from'):
+                try:
+                    g_dt = ethiopian_to_gregorian(post['eth_year_from'], post['eth_month_from'], post['eth_day_from'])
+                    date_from_str = g_dt.strftime('%Y-%m-%d')
+                except Exception:
+                    pass
+
+            if not date_to_str and post.get('eth_year_to') and post.get('eth_month_to') and post.get('eth_day_to'):
+                try:
+                    g_dt = ethiopian_to_gregorian(post['eth_year_to'], post['eth_month_to'], post['eth_day_to'])
+                    date_to_str = g_dt.strftime('%Y-%m-%d')
+                except Exception:
+                    pass
 
             if not date_from_str:
                 errors.append(_("Please select a Start Date."))

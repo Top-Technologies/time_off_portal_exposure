@@ -301,13 +301,15 @@
                                                     <span class="fw-semibold text-dark" t-esc="leave.holiday_status_id.name"/>
                                                 </td>
                                                 <td>
-                                                    <span t-esc="leave.request_date_from"/>
+                                                    <div><span t-esc="leave.request_date_from"/></div>
+                                                    <div t-if="leave.ethiopian_date_from" class="small text-success fw-semibold"><t t-esc="leave.ethiopian_date_from"/></div>
                                                     <t t-if="leave.request_unit_half">
                                                         <span class="badge bg-secondary ms-1"><t t-esc="'Morning' if leave.request_date_from_period == 'am' else 'Afternoon'"/></span>
                                                     </t>
                                                 </td>
                                                 <td>
-                                                    <span t-esc="leave.request_date_to or leave.request_date_from"/>
+                                                    <div><span t-esc="leave.request_date_to or leave.request_date_from"/></div>
+                                                    <div t-if="leave.ethiopian_date_to" class="small text-success fw-semibold"><t t-esc="leave.ethiopian_date_to"/></div>
                                                 </td>
                                                 <td>
                                                     <span class="fw-bold">
@@ -446,20 +448,141 @@
                                         <div id="leave_type_balance_indicator" class="mt-2"></div>
                                     </div>
 
-                                    <div class="row g-3 mb-3">
-                                        <!-- 2. Date From -->
-                                        <div class="col-12 col-md-6">
-                                            <label for="date_from" class="form-label fw-bold">Start Date <span class="text-danger">*</span></label>
-                                            <input type="date" class="form-control" id="date_from" name="date_from"
-                                                   t-att-value="post.get('date_from', today)" required="required"/>
+                                    <!-- 2. Dual Calendar Date Selection Card (Gregorian & Ethiopian / Amharic) -->
+                                    <div class="card border rounded-3 p-3 mb-4 bg-light bg-opacity-25 shadow-xs">
+                                        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center border-bottom pb-2 mb-3 gap-2">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="badge bg-primary px-2 py-1"><i class="fa fa-calendar me-1"/> Dual Calendar</span>
+                                                <span class="fw-bold text-dark">የቀን መምረጫ (Gregorian &amp; Ethiopian Calendar)</span>
+                                            </div>
+                                            <div class="small text-muted">
+                                                <i class="fa fa-refresh me-1 text-primary"/> Automatically Synchronized (ሁለቱም እኩል ይመሳሰላሉ)
+                                            </div>
                                         </div>
 
-                                        <!-- 3. Date To -->
-                                        <div class="col-12 col-md-6" id="date_to_wrapper">
-                                            <label for="date_to" class="form-label fw-bold">End Date <span class="text-danger">*</span></label>
-                                            <input type="date" class="form-control" id="date_to" name="date_to"
-                                                   t-att-value="post.get('date_to', today)" required="required"/>
-                                            <div class="form-text text-muted small">Inclusive date range (e.g. 02 to 04 counts 3 days).</div>
+                                        <!-- Start Date Dual Controls -->
+                                        <div class="row g-3 mb-3 p-3 bg-white border rounded-3">
+                                            <!-- Gregorian Start Date -->
+                                            <div class="col-12 col-lg-5">
+                                                <label for="date_from" class="form-label fw-bold d-flex justify-content-between align-items-center">
+                                                    <span>Start Date (Gregorian) <span class="text-danger">*</span></span>
+                                                    <span class="badge bg-secondary-subtle text-secondary small">ፈረንጆች</span>
+                                                </label>
+                                                <input type="date" class="form-control form-control-lg" id="date_from" name="date_from"
+                                                       t-att-value="post.get('date_from', today)" required="required"/>
+                                            </div>
+
+                                            <div class="col-12 col-lg-1 d-none d-lg-flex align-items-center justify-content-center text-muted">
+                                                <i class="fa fa-exchange fa-lg text-primary opacity-50"/>
+                                            </div>
+
+                                            <!-- Ethiopian Start Date -->
+                                            <div class="col-12 col-lg-6">
+                                                <label class="form-label fw-bold d-flex justify-content-between align-items-center">
+                                                    <span>መጀመሪያ ቀን (Ethiopian Date) <span class="text-danger">*</span></span>
+                                                    <span class="badge bg-success-subtle text-success small">ኢትዮጵያ</span>
+                                                </label>
+                                                <div class="row g-1">
+                                                    <div class="col-5">
+                                                        <select class="form-select form-select-lg" id="eth_month_from" name="eth_month_from" title="ወር (Month)">
+                                                            <option value="1">1 - መስከረም</option>
+                                                            <option value="2">2 - ጥቅምት</option>
+                                                            <option value="3">3 - ኅዳር</option>
+                                                            <option value="4">4 - ታኅሣሥ</option>
+                                                            <option value="5">5 - ጥር</option>
+                                                            <option value="6">6 - የካቲት</option>
+                                                            <option value="7">7 - መጋቢት</option>
+                                                            <option value="8">8 - ሚያዝያ</option>
+                                                            <option value="9">9 - ግንቦት</option>
+                                                            <option value="10">10 - ሰኔ</option>
+                                                            <option value="11">11 - ሐምሌ</option>
+                                                            <option value="12">12 - ነሐሴ</option>
+                                                            <option value="13">13 - ጳጉሜ</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-3">
+                                                        <select class="form-select form-select-lg" id="eth_day_from" name="eth_day_from" title="ቀን (Day)">
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <input type="number" class="form-control form-control-lg fw-bold" id="eth_year_from" name="eth_year_from"
+                                                               min="2010" max="2040" placeholder="ዓመት (Year)"/>
+                                                    </div>
+                                                </div>
+                                                <div class="d-flex justify-content-between align-items-center mt-2">
+                                                    <div class="small fw-bold text-success" id="eth_badge_from"></div>
+                                                    <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" data-bs-toggle="collapse" data-bs-target="#eth_collapse_calendar_from">
+                                                        <i class="fa fa-calendar-o me-1"/> የቀን ሰሌዳ (Calendar)
+                                                    </button>
+                                                </div>
+                                                <div class="collapse mt-2" id="eth_collapse_calendar_from">
+                                                    <div id="eth_calendar_grid_from"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- End Date Dual Controls -->
+                                        <div id="date_to_wrapper">
+                                            <div class="row g-3 p-3 bg-white border rounded-3">
+                                                <!-- Gregorian End Date -->
+                                                <div class="col-12 col-lg-5">
+                                                    <label for="date_to" class="form-label fw-bold d-flex justify-content-between align-items-center">
+                                                        <span>End Date (Gregorian) <span class="text-danger">*</span></span>
+                                                        <span class="badge bg-secondary-subtle text-secondary small">ፈረንጆች</span>
+                                                    </label>
+                                                    <input type="date" class="form-control form-control-lg" id="date_to" name="date_to"
+                                                           t-att-value="post.get('date_to', today)" required="required"/>
+                                                    <div class="form-text text-muted small">Inclusive date range (e.g. 02 to 04 counts 3 days).</div>
+                                                </div>
+
+                                                <div class="col-12 col-lg-1 d-none d-lg-flex align-items-center justify-content-center text-muted">
+                                                    <i class="fa fa-exchange fa-lg text-primary opacity-50"/>
+                                                </div>
+
+                                                <!-- Ethiopian End Date -->
+                                                <div class="col-12 col-lg-6">
+                                                    <label class="form-label fw-bold d-flex justify-content-between align-items-center">
+                                                        <span>መጨረሻ ቀን (Ethiopian Date) <span class="text-danger">*</span></span>
+                                                        <span class="badge bg-success-subtle text-success small">ኢትዮጵያ</span>
+                                                    </label>
+                                                    <div class="row g-1">
+                                                        <div class="col-5">
+                                                            <select class="form-select form-select-lg" id="eth_month_to" name="eth_month_to" title="ወር (Month)">
+                                                                <option value="1">1 - መስከረም</option>
+                                                                <option value="2">2 - ጥቅምት</option>
+                                                                <option value="3">3 - ኅዳር</option>
+                                                                <option value="4">4 - ታኅሣሥ</option>
+                                                                <option value="5">5 - ጥር</option>
+                                                                <option value="6">6 - የካቲት</option>
+                                                                <option value="7">7 - መጋቢት</option>
+                                                                <option value="8">8 - ሚያዝያ</option>
+                                                                <option value="9">9 - ግንቦት</option>
+                                                                <option value="10">10 - ሰኔ</option>
+                                                                <option value="11">11 - ሐምሌ</option>
+                                                                <option value="12">12 - ነሐሴ</option>
+                                                                <option value="13">13 - ጳጉሜ</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-3">
+                                                            <select class="form-select form-select-lg" id="eth_day_to" name="eth_day_to" title="ቀን (Day)">
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <input type="number" class="form-control form-control-lg fw-bold" id="eth_year_to" name="eth_year_to"
+                                                                   min="2010" max="2040" placeholder="ዓመት (Year)"/>
+                                                        </div>
+                                                    </div>
+                                                    <div class="d-flex justify-content-between align-items-center mt-2">
+                                                        <div class="small fw-bold text-success" id="eth_badge_to"></div>
+                                                        <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" data-bs-toggle="collapse" data-bs-target="#eth_collapse_calendar_to">
+                                                            <i class="fa fa-calendar-o me-1"/> የቀን ሰሌዳ (Calendar)
+                                                        </button>
+                                                    </div>
+                                                    <div class="collapse mt-2" id="eth_collapse_calendar_to">
+                                                        <div id="eth_calendar_grid_to"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -650,10 +773,16 @@
                                                 (<t t-esc="'Morning' if leave.request_date_from_period == 'am' else 'Afternoon'"/>)
                                             </t>
                                         </div>
+                                        <div t-if="leave.ethiopian_date_from" class="small text-success fw-semibold">
+                                            <t t-esc="leave.ethiopian_date_from"/>
+                                        </div>
                                     </div>
                                     <div class="col-6 col-md-4">
                                         <div class="text-muted small">To</div>
                                         <div class="fw-bold text-dark"><t t-esc="leave.request_date_to or leave.request_date_from"/></div>
+                                        <div t-if="leave.ethiopian_date_to" class="small text-success fw-semibold">
+                                            <t t-esc="leave.ethiopian_date_to"/>
+                                        </div>
                                     </div>
                                     <div class="col-6 col-md-4">
                                         <div class="text-muted small">Department</div>
@@ -962,7 +1091,10 @@
                                                     <span class="fw-semibold text-primary" t-esc="req.holiday_status_id.name"/>
                                                 </td>
                                                 <td>
-                                                    <span t-esc="req.request_date_from"/> &amp;rarr; <span t-esc="req.request_date_to or req.request_date_from"/>
+                                                    <div><span t-esc="req.request_date_from"/> &amp;rarr; <span t-esc="req.request_date_to or req.request_date_from"/></div>
+                                                    <div t-if="req.ethiopian_date_display" class="small text-success fw-semibold">
+                                                        <i class="fa fa-calendar-o me-1"/> <t t-esc="req.ethiopian_date_display"/>
+                                                    </div>
                                                 </td>
                                                 <td>
                                                     <span class="fw-bold">

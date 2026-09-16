@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
+from .ethiopian_date_utils import format_ethiopian_date, gregorian_to_ethiopian, ethiopian_to_gregorian
 
 
 class HrLeave(models.Model):
@@ -14,6 +15,25 @@ class HrLeave(models.Model):
         ('refused', 'Refused'),
         ('cancelled', 'Cancelled'),
     ], string="Portal Status", compute="_compute_portal_state", store=True)
+
+    ethiopian_date_from = fields.Char(
+        string="Ethiopian Start Date",
+        compute="_compute_ethiopian_dates",
+        store=True,
+        help="Start date expressed in the Ethiopian calendar"
+    )
+    ethiopian_date_to = fields.Char(
+        string="Ethiopian End Date",
+        compute="_compute_ethiopian_dates",
+        store=True,
+        help="End date expressed in the Ethiopian calendar"
+    )
+    ethiopian_date_display = fields.Char(
+        string="Ethiopian Date Range",
+        compute="_compute_ethiopian_dates",
+        store=True,
+        help="Formatted date range in Ethiopian calendar"
+    )
 
     manager_approved = fields.Boolean(
         string="Manager Approved",
@@ -42,6 +62,30 @@ class HrLeave(models.Model):
         default=False,
         copy=False
     )
+
+    @api.depends('request_date_from', 'request_date_to')
+    def _compute_ethiopian_dates(self):
+        for leave in self:
+            d_from = leave.request_date_from or (leave.date_from.date() if leave.date_from else False)
+            d_to = leave.request_date_to or (leave.date_to.date() if leave.date_to else False)
+
+            if d_from:
+                leave.ethiopian_date_from = format_ethiopian_date(d_from, lang='am')
+            else:
+                leave.ethiopian_date_from = ''
+
+            if d_to:
+                leave.ethiopian_date_to = format_ethiopian_date(d_to, lang='am')
+            else:
+                leave.ethiopian_date_to = leave.ethiopian_date_from
+
+            if leave.ethiopian_date_from:
+                if leave.ethiopian_date_to and leave.ethiopian_date_to != leave.ethiopian_date_from:
+                    leave.ethiopian_date_display = f"{leave.ethiopian_date_from} - {leave.ethiopian_date_to}"
+                else:
+                    leave.ethiopian_date_display = leave.ethiopian_date_from
+            else:
+                leave.ethiopian_date_display = ''
 
     @api.depends('state', 'manager_approved', 'holiday_status_id.leave_validation_type')
     def _compute_portal_state(self):
