@@ -426,11 +426,13 @@ class TimeOffCustomerPortal(CustomerPortal):
     @http.route(['/my/time_off/<int:leave_id>/cancel'], type='http', auth='user', methods=['POST'], website=True, csrf=True)
     def portal_my_time_off_cancel(self, leave_id, **kw):
         leave = self._check_leave_access(leave_id, mode='cancel')
+        redirect_url = kw.get('redirect_to') or f'/my/time_off/{leave_id}'
+        sep = '&' if '?' in redirect_url else '?'
         try:
             leave.action_portal_cancel()
         except Exception as e:
-            return request.redirect(f'/my/time_off/{leave_id}?error={str(e)}')
-        return request.redirect(f'/my/time_off/{leave_id}')
+            return request.redirect(f'{redirect_url}{sep}error={str(e)}')
+        return request.redirect(f'{redirect_url}{sep}cancelled=1')
 
     # -------------------------------------------------------------------------
     # Portal Manager Approvals Dashboard
@@ -490,10 +492,25 @@ class TimeOffCustomerPortal(CustomerPortal):
             ('manager_approved', '=', False)
         ])
 
+        subordinates_stats = {}
+        for sub in subordinates:
+            subordinates_stats[sub.id] = {
+                'pending': Leave.search_count([
+                    ('employee_id', '=', sub.id),
+                    ('state', 'in', ['confirm', 'validate1']),
+                    ('manager_approved', '=', False)
+                ]),
+                'approved': Leave.search_count([
+                    ('employee_id', '=', sub.id),
+                    ('state', '=', 'validate')
+                ]),
+            }
+
         values = {
             'page_name': 'time_off_to_approve',
             'employee': employee,
             'subordinates': subordinates,
+            'subordinates_stats': subordinates_stats,
             'leaves': leaves,
             'pending_approval_count': pending_approval_count,
             'pager': pager,

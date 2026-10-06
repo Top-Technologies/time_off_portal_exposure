@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
+from odoo.tools import email_normalize
 
 
 class HrLeave(models.Model):
@@ -67,6 +68,32 @@ class HrLeave(models.Model):
                     leave.portal_state = 'pending_manager'
             else:
                 leave.portal_state = 'draft'
+
+    @api.depends_context('uid')
+    def _compute_description(self):
+        super()._compute_description()
+        is_officer = self.env.user.has_group('hr_holidays.group_hr_holidays_user')
+        current_emp = self.env.user.get_portal_employee() if hasattr(self.env.user, 'get_portal_employee') else False
+
+        for leave in self:
+            if leave.name == '*****':
+                emp = leave.employee_id
+                # Check if current user is direct manager, leave manager, or portal subordinate manager
+                is_manager = (
+                    is_officer or
+                    leave.user_id == self.env.user or
+                    emp.leave_manager_id == self.env.user or
+                    emp.parent_id.user_id == self.env.user or
+                    (current_emp and (
+                        emp.parent_id == current_emp or
+                        emp in current_emp.get_subordinate_employees() or
+                        emp.leave_manager_id == self.env.user
+                    )) or
+                    self.env.is_superuser()
+                )
+                if is_manager:
+                    leave.name = leave.sudo().private_name
+
 
     @api.constrains('holiday_status_id', 'employee_id', 'state')
     def _check_portal_leave_allocation_balance(self):
@@ -203,13 +230,19 @@ class HrLeave(models.Model):
             if leave.state not in ['draft', 'confirm', 'validate1']:
                 raise UserError(_("You can only cancel pending requests."))
 
+            leave_sudo = leave.sudo()
+            leave_sudo.write({'state': 'cancel'})
             try:
-                leave.sudo().action_cancel()
+                leave_sudo._post_leave_cancel()
             except Exception:
-                leave.sudo().write({'state': 'cancel'})
+                pass
+            try:
+                leave_sudo.activity_update()
+            except Exception:
+                pass
 
             # Clean, concise cancellation note in chatter
-            leave.sudo().message_post(
+            leave_sudo.message_post(
                 body=_("🚫 <b>Cancelled by Employee:</b> %s.") % self.env.user.name,
                 message_type='comment',
                 subtype_xmlid='mail.mt_comment',
@@ -264,14 +297,87 @@ class HrLeave(models.Model):
                 leave._send_mail_safe('time_off_portal_exposure.email_template_time_off_submitted_manager')
 
     def _send_mail_safe(self, template_xml_id):
-        """ Helper to send notification emails directly without polluting the record's chatter thread """
+        """ Helper to send notification emails directly without polluting the record's chatter thread.
+        Safely validates that the recipient has a valid email address before dispatching to avoid
+        creating failed mail notifications that trigger the 'mail.resend.message' wizard.
+        """
         template = self.env.ref(template_xml_id, raise_if_not_found=False)
-        if template:
+        if not template:
+            return
+
+        for leave in self:
+            # 1. Resolve target partner based on the template
+            target_partner = False
+            if 'submitted_manager' in template_xml_id:
+                mgr_user = leave.employee_id.parent_id.user_id or leave.employee_id.leave_manager_id
+                target_partner = mgr_user.partner_id if mgr_user else leave.employee_id.parent_id.work_contact_id
+            elif 'manager_approved_hr' in template_xml_id:
+                target_partner = leave.employee_id.time_off_officer_id.partner_id
+            else:
+                # Employee notification templates
+                target_partner = leave.employee_id.user_id.partner_id or leave.employee_id.work_contact_id
+
+            if not target_partner:
+                continue
+
+            # 2. Check if target partner has a valid normalized email, or sync from employee/user
+            if not email_normalize(target_partner.email):
+                cand = (
+                    (leave.employee_id.work_email or leave.employee_id.private_email or leave.employee_id.user_id.email)
+                    if target_partner in (leave.employee_id.user_id.partner_id, leave.employee_id.work_contact_id)
+                    else False
+                )
+                norm = email_normalize(cand) if cand else False
+                if norm:
+                    target_partner.sudo().write({'email': norm})
+                else:
+                    # No valid email found: skip email dispatch to prevent SMTP delivery failure
+                    # and the resulting 'mail.resend.message' popup asking the manager for an email address.
+                    continue
+
             try:
                 template.sudo().send_mail(
-                    self.id,
+                    leave.id,
                     force_send=True,
                     email_values={'model': False, 'res_id': False, 'auto_delete': True}
                 )
             except Exception:
                 pass
+
+    def message_post(self, **kwargs):
+        """
+        Filter out partners who do not have a valid email address from partner_ids when notifying
+        portal users. This prevents Odoo's mail engine from scheduling email delivery to missing or
+        invalid email addresses, which creates delivery failure records and triggers the
+        'mail.resend.message' (Sending Failures) popup wizard prompting the manager for an email address.
+        """
+        partner_ids = kwargs.get('partner_ids')
+        if partner_ids:
+            clean_partner_ids = []
+            for pid in partner_ids:
+                partner = self.env['res.partner'].browse(pid)
+                if not email_normalize(partner.email):
+                    # Check linked users/employee for a valid email fallback to sync
+                    cand_email = False
+                    if partner.user_ids:
+                        cand_email = partner.user_ids[0].email
+                    emp = self.env['hr.employee'].sudo().search([
+                        '|', ('work_contact_id', '=', partner.id), ('user_id', 'in', partner.user_ids.ids)
+                    ], limit=1)
+                    if emp and not cand_email:
+                        cand_email = emp.work_email or emp.private_email
+
+                    norm = email_normalize(cand_email) if cand_email else False
+                    if norm:
+                        partner.sudo().write({'email': norm})
+                        clean_partner_ids.append(pid)
+                    else:
+                        # Partner has no valid email; omit from partner_ids so Odoo doesn't try
+                        # to send an email notification that will fail and prompt the manager.
+                        continue
+                else:
+                    clean_partner_ids.append(pid)
+            kwargs['partner_ids'] = clean_partner_ids
+
+        return super().message_post(**kwargs)
+

@@ -3,9 +3,34 @@ from datetime import date
 from odoo import api, fields, models, _
 
 
+class HrEmployeeBase(models.AbstractModel):
+    _inherit = 'hr.employee.base'
+
+    leave_manager_id = fields.Many2one(
+        'res.users',
+        string="Time Off Approver",
+        compute='_compute_leave_manager',
+        store=True,
+        readonly=False,
+        domain="['|', ('company_ids', '=', False), ('company_ids', 'in', company_id)]",
+        help='Select the user responsible for approving Time Off of this employee (portal or internal user).\n'
+             'If empty, the approval is done by an Administrator or Approver.'
+    )
+
+
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
+    leave_manager_id = fields.Many2one(
+        'res.users',
+        string="Time Off Approver",
+        compute='_compute_leave_manager',
+        store=True,
+        readonly=False,
+        domain="['|', ('company_ids', '=', False), ('company_ids', 'in', company_id)]",
+        help='Select the user responsible for approving Time Off of this employee (portal or internal user).\n'
+             'If empty, the approval is done by an Administrator or Approver.'
+    )
     time_off_officer_id = fields.Many2one(
         'res.users',
         string="Time Off Officer",
@@ -25,26 +50,33 @@ class HrEmployee(models.Model):
 
     def _compute_portal_manager_status(self):
         for employee in self:
-            subordinates = self.env['hr.employee'].sudo().search([
+            manager_user_id = employee.user_id.id if employee.user_id else False
+            sub_domain = [
                 '|',
                 ('parent_id', '=', employee.id),
-                ('leave_manager_id', '=', employee.user_id.id if employee.user_id else False),
+                ('leave_manager_id', '=', manager_user_id),
                 ('id', '!=', employee.id),
                 ('active', '=', True)
-            ])
+            ]
+            if employee.work_contact_id:
+                sub_domain = ['|', ('parent_id.work_contact_id', '=', employee.work_contact_id.id)] + sub_domain
+            subordinates = self.env['hr.employee'].sudo().search(sub_domain)
             employee.portal_subordinate_count = len(subordinates)
             employee.is_portal_manager = len(subordinates) > 0
 
     def get_subordinate_employees(self):
         """ Returns all direct and indirect subordinates for this employee """
         self.ensure_one()
+        manager_user_id = self.user_id.id if self.user_id else False
         domain = [
             '|',
             ('parent_id', '=', self.id),
-            ('leave_manager_id', '=', self.user_id.id if self.user_id else False),
+            ('leave_manager_id', '=', manager_user_id),
             ('id', '!=', self.id),
             ('active', '=', True)
         ]
+        if self.work_contact_id:
+            domain = ['|', ('parent_id.work_contact_id', '=', self.work_contact_id.id)] + domain
         return self.env['hr.employee'].sudo().search(domain)
 
     def get_portal_leave_balances(self, target_date=None):

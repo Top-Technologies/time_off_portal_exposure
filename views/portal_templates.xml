@@ -112,6 +112,22 @@
 
             <div class="container-fluid px-0 py-3">
 
+                <!-- Action Notifications -->
+                <t t-if="request.params.get('cancelled')">
+                    <div class="alert alert-warning alert-dismissible fade show shadow-sm rounded-3 mb-4" role="alert">
+                        <h5 class="alert-heading fw-bold mb-1"><i class="fa fa-ban me-2"/>Request Cancelled</h5>
+                        <p class="mb-0">Your time off request has been successfully cancelled.</p>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"/>
+                    </div>
+                </t>
+                <t t-if="request.params.get('error')">
+                    <div class="alert alert-danger alert-dismissible fade show shadow-sm rounded-3 mb-4" role="alert">
+                        <h5 class="alert-heading fw-bold mb-1"><i class="fa fa-exclamation-triangle me-2"/>Notice</h5>
+                        <p class="mb-0" t-esc="request.params.get('error')"/>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"/>
+                    </div>
+                </t>
+
                 <!-- Header & Quick Action -->
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
                     <div>
@@ -343,9 +359,20 @@
                                                     </t>
                                                 </td>
                                                 <td class="text-end">
-                                                    <a t-attf-href="/my/time_off/{{ leave.id }}" class="btn btn-sm btn-outline-primary" title="View Details">
-                                                        <i class="fa fa-eye"/> Details
-                                                    </a>
+                                                    <div class="d-inline-flex gap-1 align-items-center">
+                                                        <a t-attf-href="/my/time_off/{{ leave.id }}" class="btn btn-sm btn-outline-primary" title="View Details">
+                                                            <i class="fa fa-eye"/> Details
+                                                        </a>
+                                                        <t t-if="leave.portal_state in ('draft', 'pending_manager', 'pending_hr')">
+                                                            <form t-attf-action="/my/time_off/{{ leave.id }}/cancel" method="post" class="d-inline m-0">
+                                                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                                <input type="hidden" name="redirect_to" value="/my/time_off"/>
+                                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Cancel Request" onclick="return confirm('Are you sure you want to cancel this request?');">
+                                                                    <i class="fa fa-times"/> Cancel
+                                                                </button>
+                                                            </form>
+                                                        </t>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         </t>
@@ -571,6 +598,22 @@
                     </div>
                 </t>
 
+                <!-- Action Notifications -->
+                <t t-if="request.params.get('cancelled')">
+                    <div class="alert alert-warning alert-dismissible fade show shadow-sm rounded-3 mb-4" role="alert">
+                        <h5 class="alert-heading fw-bold mb-1"><i class="fa fa-ban me-2"/>Request Cancelled</h5>
+                        <p class="mb-0">Your time off request has been successfully cancelled.</p>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"/>
+                    </div>
+                </t>
+                <t t-if="request.params.get('error')">
+                    <div class="alert alert-danger alert-dismissible fade show shadow-sm rounded-3 mb-4" role="alert">
+                        <h5 class="alert-heading fw-bold mb-1"><i class="fa fa-exclamation-triangle me-2"/>Notice</h5>
+                        <p class="mb-0" t-esc="request.params.get('error')"/>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"/>
+                    </div>
+                </t>
+
                 <div class="row g-4">
                     <div class="col-12 col-lg-8">
 
@@ -665,7 +708,7 @@
                                 <div class="mb-4">
                                     <div class="text-muted small mb-1">Reason / Description:</div>
                                     <div class="p-3 bg-light rounded-3 text-dark">
-                                        <t t-esc="leave.name or 'No description provided.'"/>
+                                        <t t-esc="(leave.name if leave.name != '*****' else False) or leave.sudo().private_name or 'No description provided.'"/>
                                     </div>
                                 </div>
 
@@ -674,6 +717,14 @@
                                     <div class="alert alert-danger rounded-3 mb-4">
                                         <h6 class="fw-bold mb-1"><i class="fa fa-times-circle me-1"/> Refusal Reason:</h6>
                                         <p class="mb-0" t-esc="leave.refusal_reason or 'No reason provided.'"/>
+                                    </div>
+                                </t>
+
+                                <!-- Cancellation Notice (if cancelled) -->
+                                <t t-if="leave.portal_state == 'cancelled'">
+                                    <div class="alert alert-secondary rounded-3 mb-4 border">
+                                        <h6 class="fw-bold mb-1 text-secondary"><i class="fa fa-ban me-1"/> Request Cancelled:</h6>
+                                        <p class="mb-0 text-muted">This time off request was cancelled by the employee and is no longer awaiting approval.</p>
                                     </div>
                                 </t>
 
@@ -975,7 +1026,8 @@
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    <span class="text-truncate d-inline-block text-muted" style="max-width: 180px;" t-esc="req.name or '-'"/>
+                                                    <t t-set="unmasked_reason" t-value="(req.name if req.name != '*****' else False) or req.sudo().private_name or '-'"/>
+                                                    <span class="text-truncate d-inline-block text-muted" style="max-width: 180px;" t-att-title="unmasked_reason" t-esc="unmasked_reason"/>
                                                 </td>
                                                 <td>
                                                     <t t-if="req.portal_state == 'approved'">
