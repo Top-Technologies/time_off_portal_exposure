@@ -13,6 +13,7 @@
                     <group>
                         <field name="is_portal_submitted" readonly="1"/>
                         <field name="portal_state" readonly="1" widget="badge" decoration-info="portal_state in ('pending_manager', 'pending_hr')" decoration-success="portal_state == 'approved'" decoration-danger="portal_state == 'refused'" decoration-muted="portal_state == 'cancelled'"/>
+                        <field name="ethiopian_date_display" readonly="1" string="Ethiopian Calendar"/>
                     </group>
                     <group>
                         <field name="manager_approved" readonly="1"/>

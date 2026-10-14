@@ -32,11 +32,17 @@ function initTimeOffPortal() {
         const toggleHalfDay = () => {
             if (halfDayCheckbox.checked) {
                 if (halfDayOptions) halfDayOptions.style.display = 'block';
-                if (dateToWrapper) dateToWrapper.style.display = 'none';
+                if (dateToWrapper) {
+                    dateToWrapper.classList.add('d-none');
+                    dateToWrapper.style.display = 'none';
+                }
                 if (dateToInput && dateFromInput) dateToInput.value = dateFromInput.value;
             } else {
                 if (halfDayOptions) halfDayOptions.style.display = 'none';
-                if (dateToWrapper) dateToWrapper.style.display = 'block';
+                if (dateToWrapper) {
+                    dateToWrapper.classList.remove('d-none');
+                    dateToWrapper.style.display = '';
+                }
             }
         };
 
