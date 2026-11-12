@@ -62,5 +62,12 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
+        <!-- Leave Balance Report: Multi-Company Rule -->
+        <record id="hr_leave_balance_report_multicompany" model="ir.rule">
+            <field name="name">Leave Balance Report: Multi-Company</field>
+            <field name="model_id" ref="model_hr_leave_balance_report"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+
     </data>
 </odoo>

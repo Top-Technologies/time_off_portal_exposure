@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_leave_balance" model="ir.actions.report">
+        <field name="name">Employee Leave Balance Summary</field>
+        <field name="model">hr.leave.balance.report</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">time_off_portal_exposure.report_leave_balance_template</field>
+        <field name="report_file">time_off_portal_exposure.report_leave_balance_template</field>
+        <field name="binding_model_id" ref="model_hr_leave_balance_report"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_leave_balance_template">
+        <t t-call="web.html_container">
+            <t t-call="web.external_layout">
+                <div class="page" style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                    <div class="row mb-3">
+                        <div class="col-12 text-center border-bottom pb-2">
+                            <h2 style="color: #2c3e50; font-weight: 700; text-transform: uppercase; margin-bottom: 2px;">
+                                Employee Leave Balance Summary Report
+                            </h2>
+                            <p class="text-muted small mb-0">
+                                Official Record of Allocated, Taken, and Remaining Time Off Entitlements
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Meta Information -->
+                    <div class="row mb-4 p-2" style="background-color: #f8f9fa; border-radius: 4px; border: 1px solid #e9ecef; font-size: 13px;">
+                        <div class="col-6">
+                            <strong>Printed By:</strong> <span t-esc="env.user.name"/><br/>
+                            <strong>Generated Date:</strong> <span t-esc="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d %H:%M')"/>
+                        </div>
+                        <div class="col-6 text-end">
+                            <strong>Company:</strong> <span t-esc="res_company.name"/><br/>
+                            <strong>Total Records:</strong> <span t-esc="len(docs)"/>
+                        </div>
+                    </div>
+
+                    <!-- Balances Table -->
+                    <table class="table table-sm table-striped table-bordered text-center" style="font-size: 12px; vertical-align: middle;">
+                        <thead style="background-color: #34495e; color: #ffffff;">
+                            <tr>
+                                <th class="text-start" style="width: 25%;">Employee</th>
+                                <th class="text-start" style="width: 20%;">Department</th>
+                                <th style="width: 20%;">Time Off Type</th>
+                                <th style="width: 11%;">Allocated (Days)</th>
+                                <th style="width: 11%;">Taken (Days)</th>
+                                <th style="width: 11%;">Pending (Days)</th>
+                                <th style="width: 13%; background-color: #2c3e50;">Remaining Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-set="total_alloc" t-value="0.0"/>
+                            <t t-set="total_taken" t-value="0.0"/>
+                            <t t-set="total_pending" t-value="0.0"/>
+                            <t t-set="total_rem" t-value="0.0"/>
+                            
+                            <tr t-foreach="docs" t-as="doc">
+                                <td class="text-start fw-bold" t-esc="doc.employee_id.name"/>
+                                <td class="text-start text-muted" t-esc="doc.department_id.name or '—'"/>
+                                <td>
+                                    <span class="badge text-bg-light border" t-esc="doc.holiday_status_id.name"/>
+                                </td>
+                                <td t-esc="'%.2f' % doc.allocated_days"/>
+                                <td t-esc="'%.2f' % doc.taken_days"/>
+                                <td t-esc="'%.2f' % doc.pending_days"/>
+                                <td t-attf-style="font-weight: bold; background-color: #{'#d4edda; color: #155724;' if doc.remaining_days &gt; 0 else '#f8d7da; color: #721c24;'}">
+                                    <span t-esc="'%.2f' % doc.remaining_days"/> Days
+                                </td>
+                                
+                                <t t-set="total_alloc" t-value="total_alloc + doc.allocated_days"/>
+                                <t t-set="total_taken" t-value="total_taken + doc.taken_days"/>
+                                <t t-set="total_pending" t-value="total_pending + doc.pending_days"/>
+                                <t t-set="total_rem" t-value="total_rem + doc.remaining_days"/>
+                            </tr>
+                        </tbody>
+                        <tfoot style="background-color: #e9ecef; font-weight: bold;">
+                            <tr>
+                                <td colspan="3" class="text-end">Total Summary:</td>
+                                <td t-esc="'%.2f' % total_alloc"/>
+                                <td t-esc="'%.2f' % total_taken"/>
+                                <td t-esc="'%.2f' % total_pending"/>
+                                <td style="background-color: #ced4da;" t-esc="'%.2f Days' % total_rem"/>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <!-- Signature Block -->
+                    <div class="row mt-5 pt-4 text-center" style="font-size: 13px;">
+                        <div class="col-4">
+                            <div style="border-top: 1px dashed #6c757d; padding-top: 5px;">
+                                <strong>Prepared By (HR Officer)</strong>
+                            </div>
+                        </div>
+                        <div class="col-4"></div>
+                        <div class="col-4">
+                            <div style="border-top: 1px dashed #6c757d; padding-top: 5px;">
+                                <strong>Approved By (HR Manager)</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>
+

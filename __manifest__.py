@@ -46,8 +46,10 @@ Key Features:
         'security/security.xml',
         'security/ir.model.access.csv',
         'data/mail_template_data.xml',
+        'reports/leave_balance_report.xml',
         'views/hr_employee_views.xml',
         'views/hr_leave_views.xml',
+        'views/hr_leave_balance_report_views.xml',
         'views/portal_templates.xml',
     ],
     'assets': {

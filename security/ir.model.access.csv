@@ -4,3 +4,5 @@ access_hr_leave_type_portal,hr.leave.type.portal,hr_holidays.model_hr_leave_type
 access_hr_leave_allocation_portal,hr.leave.allocation.portal,hr_holidays.model_hr_leave_allocation,base.group_portal,1,0,0,0
 access_hr_employee_portal,hr.employee.portal,hr.model_hr_employee,base.group_portal,1,0,0,0
 access_hr_employee_public_portal,hr.employee.public.portal,hr.model_hr_employee_public,base.group_portal,1,0,0,0
+access_hr_leave_balance_report_officer,hr.leave.balance.report.officer,model_hr_leave_balance_report,hr_holidays.group_hr_holidays_user,1,0,0,0
+access_hr_leave_balance_report_manager,hr.leave.balance.report.manager,model_hr_leave_balance_report,hr_holidays.group_hr_holidays_manager,1,0,0,0
