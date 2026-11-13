@@ -41,6 +41,7 @@ Key Features:
         'hr',
         'hr_holidays',
         'mail',
+        'Farm-Management',
     ],
     'data': [
         'security/security.xml',
