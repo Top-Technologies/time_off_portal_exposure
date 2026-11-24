@@ -72,11 +72,11 @@
     </data>
 
     <data noupdate="0">
-        <!-- Global Classification Segregation Rule for Leave Balance Report -->
+        <!-- Global Classification & Farm Segregation Rule for Leave Balance Report -->
         <record id="hr_leave_balance_report_classification_rule" model="ir.rule">
-            <field name="name">Leave Balance Report Classification Segregation Rule</field>
+            <field name="name">Leave Balance Report Classification &amp; Farm Segregation Rule</field>
             <field name="model_id" ref="model_hr_leave_balance_report"/>
-            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('employee_id.farm_employee_type', 'in', user._get_allowed_farm_employee_types())]</field>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), '&amp;', ('employee_id.farm_employee_type', 'in', user._get_allowed_farm_employee_types()), '|', ('employee_id.farm_employee_type', 'not in', ['permanent', 'temporary', 'zemach']), '|', ('employee_id.current_farm_id', 'in', user._get_allowed_farm_ids()), ('employee_id.initial_farm_id', 'in', user._get_allowed_farm_ids())]</field>
             <field name="global" eval="True"/>
         </record>
     </data>
